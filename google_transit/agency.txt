@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url
+LTC - 2026 Spring Schedules,London Transit,http://www.londontransit.ca,America/Toronto,en,519-451-1347,http://www.londontransit.ca/fares-and-passes/fares/
