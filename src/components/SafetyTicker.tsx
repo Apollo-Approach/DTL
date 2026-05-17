@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 
 export default function SafetyTicker() {
-  const [advisories, setAdvisories] = useState<any[]>([]);
+  const [advisories, setAdvisories] = useState<{title: string}[]>([]);
 
   useEffect(() => {
     fetch('/api/safety/advisories')

@@ -3,6 +3,38 @@ import tripMappingRaw from '@/lib/data/trip_mapping.json';
 
 const tripMapping = tripMappingRaw as Record<string, string>;
 
+interface TransitBus {
+  id: string;
+  headsign: string | null;
+  routeId: string;
+  targetLng: number;
+  targetLat: number;
+  bearing: number;
+  speed: number;
+  timestamp: number;
+  isDelayed: boolean;
+  currentStatus: number;
+  stopId: string;
+  directionId: number;
+  occupancyStatus: number;
+  occupancyPercentage?: number;
+}
+
+interface GtfsEntity {
+  id?: string;
+  vehicle?: {
+    vehicle?: { id?: string };
+    trip?: { tripId?: string; trip_id?: string; routeId?: string; route_id?: string; direction_id?: number };
+    position?: { latitude?: number; longitude?: number; bearing?: number; speed?: number };
+    timestamp?: number;
+    current_status?: number;
+    stop_id?: string;
+    occupancy_status?: number;
+    occupancy_percentage?: number;
+  };
+  Vehicle?: GtfsEntity['vehicle'];
+}
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; 
 
@@ -30,11 +62,11 @@ export async function GET() {
     if (!response.ok) throw new Error(`LTC Feed Error: ${response.status}`);
 
     const data = await response.json();
-    const buses: any[] = [];
+    const buses: TransitBus[] = [];
     
     const entities = data.entity || data.Entity || data || [];
 
-    entities.forEach((entity: any) => {
+    entities.forEach((entity: GtfsEntity) => {
       const v = entity.vehicle || entity.Vehicle;
       if (v?.position?.latitude && v?.position?.longitude) {
         const nowSec = Math.floor(Date.now() / 1000);
@@ -45,7 +77,7 @@ export async function GET() {
         const headsign = tripId ? tripMapping[tripId] : null;
 
         buses.push({
-          id: v.vehicle?.id || entity.id,
+          id: v.vehicle?.id || entity.id || '',
           headsign: headsign,
           routeId: v.trip?.routeId || v.trip?.route_id || 'LTC',
           targetLng: v.position.longitude,
@@ -54,10 +86,10 @@ export async function GET() {
           speed: v.position.speed || 0,
           timestamp: timestamp,
           isDelayed: isDelayed,
-          currentStatus: v.current_status,
-          stopId: v.stop_id,
-          directionId: v.trip?.direction_id,
-          occupancyStatus: v.occupancy_status,
+          currentStatus: v.current_status ?? 0,
+          stopId: v.stop_id || '',
+          directionId: v.trip?.direction_id ?? 0,
+          occupancyStatus: v.occupancy_status ?? 0,
           occupancyPercentage: v.occupancy_percentage
         });
       }

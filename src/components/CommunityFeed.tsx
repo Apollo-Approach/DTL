@@ -1,13 +1,14 @@
 // src/components/CommunityFeed.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { SocialPost } from '@/types';
 
 export default function CommunityFeed({ initialPosts }: { initialPosts: SocialPost[] }) {
   const [posts, setPosts] = useState<SocialPost[]>(initialPosts);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     // Listen for live posts dropping into the database
@@ -45,12 +46,15 @@ export default function CommunityFeed({ initialPosts }: { initialPosts: SocialPo
             rel="noopener noreferrer"
             className="min-w-[200px] max-w-[200px] bg-black rounded-lg border border-neutral-800 overflow-hidden snap-center shrink-0 hover:border-pink-500 transition-colors block relative group"
           >
-            {/* Note: In production we'd use Next/Image, but native img is fine for MVP external URLs */}
-            <img 
-              src={post.media_url} 
-              alt={`Post by ${post.username}`} 
-              className="w-full h-40 object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-            />
+            <div className="relative w-full h-40">
+              <Image 
+                unoptimized
+                fill
+                src={post.media_url} 
+                alt={`Post by ${post.username}`} 
+                className="object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+              />
+            </div>
             {post.media_type === 'VIDEO' && (
               <div className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full backdrop-blur-sm text-white text-xs font-bold">▶</div>
             )}

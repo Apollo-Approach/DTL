@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import MapWrapper from '@/components/MapWrapper';
 import { createClient } from '@/lib/supabase/client';
+import { Venue, SafetyIncident } from '@/types';
 
 export default function CrisisCloudPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState('');
   
-  const [venues, setVenues] = useState([]);
-  const [incidents, setIncidents] = useState([]);
-  const supabase = createClient();
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [incidents, setIncidents] = useState<SafetyIncident[]>([]);
+  const supabase = React.useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (unlocked) {
@@ -22,13 +23,13 @@ export default function CrisisCloudPage() {
         setIncidents(incidentsRes.data || []);
       });
     }
-  }, [unlocked]);
+  }, [unlocked, supabase]);
 
   const handlePinInput = (num: string) => {
     const newPin = pin + num;
     setPin(newPin);
     if (newPin.length === 4) {
-      if (newPin === '1234') { // Mock PIN for demo
+      if (newPin === (process.env.NEXT_PUBLIC_CRISIS_PIN || '')) { // Set NEXT_PUBLIC_CRISIS_PIN in .env.local
         setUnlocked(true);
       } else {
         setTimeout(() => setPin(''), 500); // Reset on error

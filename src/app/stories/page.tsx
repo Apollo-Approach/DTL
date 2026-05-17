@@ -1,13 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { Upload, Video, Tag, CheckCircle, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
+interface BrollClip {
+  id: string;
+  venue_id: string;
+  video_url: string;
+  thumbnail_url?: string;
+  title?: string;
+  status: string;
+  uploaded_at: string;
+  duration_seconds?: string;
+}
+
 export default function CommunityStoriesPage() {
-  const [clips, setClips] = useState<any[]>([]);
+  const [clips, setClips] = useState<BrollClip[]>([]);
   const [activeTab, setActiveTab] = useState<'feed' | 'upload'>('feed');
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     supabase.from('broll_clips')
@@ -15,7 +27,7 @@ export default function CommunityStoriesPage() {
       .eq('is_approved', true)
       .order('uploaded_at', { ascending: false })
       .then((res) => setClips(res.data || []));
-  }, []);
+  }, [supabase]);
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center">
@@ -54,7 +66,7 @@ export default function CommunityStoriesPage() {
               </div>
               <div className="w-full md:w-1/2">
                 <h2 className="text-2xl font-bold mb-3">London Nightlife Showcase</h2>
-                <p className="text-neutral-400 mb-4">A collaborative visual diary of downtown London, curated from verified community B-Roll submissions. See the city's pulse.</p>
+                <p className="text-neutral-400 mb-4">A collaborative visual diary of downtown London, curated from verified community B-Roll submissions. See the city&apos;s pulse.</p>
                 <div className="flex gap-2">
                   <span className="bg-purple-900/50 text-purple-400 text-xs px-2 py-1 rounded font-bold">#LiveMusic</span>
                   <span className="bg-cyan-900/50 text-cyan-400 text-xs px-2 py-1 rounded font-bold">#NightMarket</span>
@@ -69,7 +81,7 @@ export default function CommunityStoriesPage() {
                 <div key={clip.id} className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden group cursor-pointer hover:border-purple-500 transition-colors">
                   <div className="aspect-video bg-neutral-800 flex items-center justify-center relative">
                     {clip.thumbnail_url ? (
-                      <img src={clip.thumbnail_url} alt={clip.title} className="w-full h-full object-cover" />
+                      <Image unoptimized fill src={clip.thumbnail_url} alt={clip.title || 'B-Roll clip'} className="object-cover" />
                     ) : (
                       <Video size={32} className="text-neutral-600 group-hover:text-purple-400 transition-colors" />
                     )}

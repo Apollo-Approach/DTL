@@ -1,94 +1,47 @@
 // src/components/InteractiveMap.tsx
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { Search, Calendar, ChevronDown } from 'lucide-react';
+import { calculateMatchScore } from '@/lib/matchScore';
+import { Session } from '@supabase/supabase-js';
+import { Venue, Event, SafetyIncident, Preferences } from '@/types';
+import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText } from './map/mapHelpers';
+import MapFilterBar from './map/MapFilterBar';
+import ModPinModal from './map/ModPinModal';
 
-// Corrected 3D Math with CLOCKWISE Winding Order (MapLibre standard for exterior rings)
-function getBusPolygon(lng: number, lat: number, bearing: number) {
-  const rad = (90 - bearing) * (Math.PI / 180);
-  const mToLng = 1 / 81500; const mToLat = 1 / 111111;
-  // Exaggerated + 20% size increase for maximum visibility (approx 19.2m x 6m footprint)
-  const l = 9.6, w = 3.0; 
-  
-  const cosA = Math.cos(rad);
-  const sinA = Math.sin(rad);
-  
-  // Exterior rings must be CLOCKWISE in MapLibre otherwise they are culled as holes!
-  // Sequence: Front-Left -> Front-Right -> Back-Right -> Back-Left
-  const offsets = [
-    [l, w],    // Front-Left
-    [l, -w],   // Front-Right
-    [-l, -w],  // Back-Right
-    [-l, w]    // Back-Left
-  ];
-  
-  const coords = offsets.map(([lx, wy]) => [
-    lng + (lx * cosA - wy * sinA) * mToLng,
-    lat + (lx * sinA + wy * cosA) * mToLat
-  ]);
-  
-  coords.push(coords[0]); 
-  return [coords];
-}
 
-const getOccupancyText = (status: number) => {
-  switch(status) {
-    case 0: return "Empty";
-    case 1: return "Many Seats Available";
-    case 2: return "Few Seats Available";
-    case 3: return "Standing Room Only";
-    case 4: return "Crushed Standing Room";
-    case 5: return "Full";
-    case 6: return "Not Accepting Passengers";
-    default: return "Unknown";
-  }
-};
-
-const getStatusText = (status: number) => {
-   switch(status) {
-     case 0: return "Incoming at";
-     case 1: return "Stopped at";
-     case 2: return "In transit to";
-     default: return "Approaching";
-   }
-};
-
-const getDirectionText = (dir: number) => {
-   if (dir === 0) return "Outbound";
-   if (dir === 1) return "Inbound";
-   return "Unknown";
-};
 
 interface InteractiveMapProps {
-  venues: any[]; 
-  incidents: any[];
-  events?: any[];
+  venues: Venue[]; 
+  incidents: SafetyIncident[];
+  events?: Event[];
+  preferences?: Preferences | null;
   mode?: 'public' | 'crisis';
 }
 
-export default function InteractiveMap({ venues = [], incidents = [], events = [], mode = 'public' }: InteractiveMapProps) {
+export default function InteractiveMap({ venues = [], incidents = [], events = [], preferences = null, mode = 'public' }: InteractiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const busStateRef = useRef<{ [id: string]: any }>({});
+  const busStateRef = useRef<{ [id: string]: BusState }>({});
   
   // Auth & UI State
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   
   // Map Decluttering Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [searchOpen, setSearchOpen] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [forYou, setForYou] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
   const [layerToggles, setLayerToggles] = useState({
     transit: true,
@@ -140,7 +93,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     if (!mapContainerRef.current) return;
 
     // Expose global function for popup buttons to call securely outside of React's state loop
-    (window as any).requestSafeWalk = async (lng: number, lat: number) => {
+    (window as unknown as { requestSafeWalk: (lng: number, lat: number) => Promise<void> }).requestSafeWalk = async (lng: number, lat: number) => {
       try {
         const res = await fetch(`/api/routing/safe-path?endLng=${lng}&endLat=${lat}`);
         const data = await res.json();
@@ -436,11 +389,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             
             if (transitRes.ok) {
               const data = await transitRes.json();
-              const activeIds = new Set(data.buses.map((b: any) => b.id));
+              const activeIds = new Set(data.buses.map((b: BusState) => b.id));
               
               // Update targets for interpolation
               const now = Date.now();
-              data.buses.forEach((bus: any) => {
+              data.buses.forEach((bus: BusState) => {
                 const existing = busStateRef.current[bus.id];
                 busStateRef.current[bus.id] = {
                   ...bus,
@@ -469,8 +422,8 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
         const renderFrame = () => {
           if (!mapRef.current) return;
-          const bodyFeatures: any[] = [];
-          const labelFeatures: any[] = [];
+          const bodyFeatures: GeoJSON.Feature<GeoJSON.Polygon>[] = [];
+          const labelFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
           const now = Date.now();
 
           Object.values(busStateRef.current).forEach((bus) => {
@@ -718,10 +671,14 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Filter Venues by Search and Late Night
+    // Filter Venues by Search and Late Night and For You
     const filteredVenues = venues.filter(venue => {
       if (searchQuery && !venue.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (activeFilter === 'LateNight' && !venue.late_night_eligible) return false;
+      if (forYou && preferences) {
+        const score = calculateMatchScore(venue.offerings, preferences);
+        if (score < 20) return false;
+      }
       // Note: dateFilter will be applied when we introduce Events in Step 3
       return true;
     });
@@ -748,7 +705,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             `<div style="color: #000; font-family: sans-serif; padding: 4px;">
               <h3 style="margin: 0; font-weight: bold; font-size: 14px;">${venue.name}</h3>
               <p style="margin: 4px 0 0 0; font-size: 11px; color: #444;">${venue.address}</p>
-              ${venue.operating_hours ? `<p style="margin: 4px 0 0 0; font-size: 10px; color: #666;">🕒 ${JSON.stringify(venue.operating_hours)}</p>` : ''}
+              ${venue.operating_hours ? `<p style="margin: 4px 0 0 0; font-size: 10px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
               ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:block; margin: 4px 0 0 0; font-size: 10px; color: #06b6d4;">🔗 Website</a>` : ''}
               ${isPopUp ? '<span style="display:inline-block; margin-top:4px; padding:2px 6px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
               <button 
@@ -845,7 +802,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       markersRef.current.push(marker);
     });
 
-  }, [venues, incidents, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter]);
+  }, [venues, incidents, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences]);
 
   // Handle Map Decluttering
   useEffect(() => {
@@ -908,255 +865,41 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      {/* CHUNK 2A: NEON BUBBLES (Instagram Stories Style Map Filters) */}
-      <div className="w-full">
-        <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
-        <div className="flex overflow-x-auto gap-4 pb-4 px-1 snap-x scrollbar-hide">
-          
-          {/* Transit Bubble */}
-          <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, transit: !prev.transit }))} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.transit ? 'bg-emerald-900/50 border-[3px] border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🚌
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
-          </button>
+      <MapFilterBar
+        layerToggles={layerToggles}
+        setLayerToggles={setLayerToggles}
+        activeFilter={activeFilter}
+        setActiveFilter={setActiveFilter}
+        forYou={forYou}
+        setForYou={setForYou}
+        preferences={preferences}
+        mode={mode}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        dateFilter={dateFilter}
+        setDateFilter={setDateFilter}
+      />
 
-          {/* Parking Bubble */}
-          <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, parking: !prev.parking }))} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.parking ? 'bg-blue-900/50 border-[3px] border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🅿️
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.parking ? 'text-blue-400' : 'text-neutral-500'}`}>Parking</span>
-          </button>
-
-          {mode === 'public' && (
-            <>
-              {/* Nightlife Bubble */}
-              <button 
-                onClick={() => {
-                  setLayerToggles(prev => ({ ...prev, retail: true }));
-                  setActiveFilter(activeFilter === 'Nightlife' ? null : 'Nightlife');
-                }} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🪩
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Clubs</span>
-              </button>
-
-              {/* Eateries Bubble */}
-              <button 
-                onClick={() => {
-                  setLayerToggles(prev => ({ ...prev, retail: true }));
-                  setActiveFilter(activeFilter === 'Eatery' ? null : 'Eatery');
-                }} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🍔
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
-              </button>
-
-              {/* Stages Bubble */}
-              <button 
-                onClick={() => {
-                  setLayerToggles(prev => ({ ...prev, retail: true }));
-                  setActiveFilter(activeFilter === 'Stage' ? null : 'Stage');
-                }} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🎸
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
-              </button>
-
-              {/* Late Night Bubble */}
-              <button 
-                onClick={() => {
-                  setLayerToggles(prev => ({ ...prev, retail: true }));
-                  setActiveFilter(activeFilter === 'LateNight' ? null : 'LateNight');
-                }} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'LateNight' ? 'bg-indigo-900/50 border-[3px] border-indigo-400 shadow-[0_0_15px_rgba(129,140,248,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🌙
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'LateNight' ? 'text-indigo-400' : 'text-neutral-500'}`}>Late Night</span>
-              </button>
-            </>
-          )}
-
-          {/* Mod Pins Bubble */}
-          <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, incidents: !prev.incidents }))} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.incidents ? 'bg-red-900/50 border-[3px] border-red-400 shadow-[0_0_15px_rgba(248,113,113,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🚨
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.incidents ? 'text-red-400' : 'text-neutral-500'}`}>Alerts</span>
-          </button>
-
-        </div>
-      </div>
-
-      {/* CHUNK 2B: SEARCH & CALENDAR */}
-      {mode === 'public' && (
-        <div className="w-full flex gap-2 px-1">
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-neutral-500" />
-            </div>
-            <input
-              type="text"
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-neutral-500 focus:outline-none focus:border-cyan-500 transition-colors"
-              placeholder="Search venues or events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="relative w-1/3 min-w-[120px]">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-4 w-4 text-neutral-500" />
-            </div>
-            <input
-              type="date"
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl py-3 pl-10 pr-2 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* CHUNK 2C: THE 3D MAP */}
+      {/* THE 3D MAP */}
       <div className="relative w-full h-[500px] lg:h-[700px] rounded-xl overflow-hidden border border-neutral-800 shadow-2xl z-0">
         <div ref={mapContainerRef} className="w-full h-full absolute inset-0" />
         
-        {/* MOD PIN PRE-DROP EDUCATION MODAL */}
+        {/* MOD PIN MODAL */}
         {pendingPinLocation && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 max-h-full overflow-y-auto">
-              {/* 911 ESCAPE HATCH */}
-              <div className="p-4 bg-red-950/40 border-b border-red-900/50">
-                <h2 className="text-red-400 font-bold text-lg mb-2 text-center">Is this a violent emergency?</h2>
-                <button onClick={() => alert('Calling 911...')} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg shadow-lg shadow-red-900/50 flex items-center justify-center gap-2 text-lg">
-                  🚨 CALL 911
-                </button>
-              </div>
-
-              <div className="p-6 space-y-6">
-                {/* CODE OF CONDUCT & LPS NOTICE */}
-                <div className="bg-neutral-800/50 p-4 rounded-xl border border-neutral-700">
-                  <p className="text-sm text-neutral-300 font-medium mb-3">
-                    This pin dispatches DTL Street Liaisons for <span className="text-white font-bold">low-risk disruptions</span>.
-                  </p>
-                  <div className="text-xs text-neutral-400 bg-neutral-900/50 p-3 rounded-lg">
-                    <span className="text-cyan-400 font-bold">LPS Notice:</span> The London Police Service relies on a data-driven model. If a crime has occurred, you must <a href="https://www.londonpolice.ca/en/services/Online-Reporting.aspx" target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline font-bold">file an official report</a> to ensure adequate city funding and response.
-                  </div>
-                </div>
-
-                {/* CATEGORY SELECTION */}
-                <div>
-                  <h3 className="text-sm text-neutral-400 uppercase tracking-widest font-bold mb-3">Select Category</h3>
-                  <div className="flex flex-col gap-2">
-                    {[
-                      { id: 'OPEN_AIR_DRUGS', label: 'Open-Air Drug Use / Trade', icon: '💉' },
-                      { id: 'CRISIS_PERSON', label: 'Person in Crisis', icon: '🆘' },
-                      { id: 'CROWD_ESCALATION', label: 'Loud / Crowd Escalation', icon: '🗣️' }
-                    ].map(cat => (
-                      <button 
-                        key={cat.id}
-                        onClick={() => setPinCategory(cat.id)}
-                        className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${pinCategory === cat.id ? 'bg-cyan-900/50 border-cyan-500 text-cyan-50' : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:bg-neutral-700'}`}
-                      >
-                        <span className="text-xl">{cat.icon}</span>
-                        <span className="font-bold">{cat.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3-5 WORD DESCRIPTION */}
-                <div>
-                  <h3 className="text-sm text-neutral-400 uppercase tracking-widest font-bold mb-2">Description (Max 5 Words)</h3>
-                  <input 
-                    type="text" 
-                    maxLength={40}
-                    value={pinDescription}
-                    onChange={(e) => setPinDescription(e.target.value)}
-                    placeholder="Describe in 3 to 5 words..."
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white placeholder-neutral-500 focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                {/* ACTION BUTTONS */}
-                <div className="flex gap-3 pt-2">
-                  <button 
-                    onClick={() => {
-                      setPendingPinLocation(null);
-                      setPinCategory('');
-                      setPinDescription('');
-                    }} 
-                    className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl border border-neutral-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    disabled={!pinCategory}
-                    onClick={() => {
-                      if (mapRef.current && pendingPinLocation) {
-                        const el = document.createElement('div');
-                        el.innerHTML = `
-                          <span class="relative flex h-6 w-6">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-6 w-6 bg-red-600 border-2 border-white shadow-lg flex items-center justify-center text-[10px]">⚠️</span>
-                          </span>
-                        `;
-                        el.className = 'cursor-pointer z-50';
-
-                        const marker = new maplibregl.Marker({ element: el })
-                          .setLngLat([pendingPinLocation.lng, pendingPinLocation.lat])
-                          .setPopup(
-                            new maplibregl.Popup({ offset: 25, closeButton: true }).setHTML(
-                              `<div style="color: #000; font-family: sans-serif; padding: 6px; min-width: 180px;">
-                                <h3 style="margin: 0 0 8px 0; font-weight: bold; font-size: 14px; color: #dc2626;">🚨 Mod Pin Logged</h3>
-                                <p style="margin: 0 0 4px 0; font-size: 12px; color: #444;"><strong>Type:</strong> ${pinCategory}</p>
-                                <p style="margin: 0 0 12px 0; font-size: 12px; color: #444;"><strong>Desc:</strong> "${pinDescription || 'No description'}"</p>
-                                <p style="margin: 0; font-size: 11px; color: #666; font-style: italic;">Liaison team dispatched.</p>
-                              </div>`
-                            )
-                          )
-                          .addTo(mapRef.current);
-                        
-                        marker.togglePopup();
-                      }
-                      
-                      setPendingPinLocation(null);
-                      setPinCategory('');
-                      setPinDescription('');
-                    }} 
-                    className={`flex-[2] py-3 font-bold rounded-xl shadow-lg transition-colors ${pinCategory ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
-                  >
-                    Submit
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ModPinModal
+            pendingPinLocation={pendingPinLocation}
+            setPendingPinLocation={setPendingPinLocation}
+            pinCategory={pinCategory}
+            setPinCategory={setPinCategory}
+            pinDescription={pinDescription}
+            setPinDescription={setPinDescription}
+            mapRef={mapRef}
+            supabase={supabase}
+          />
         )}
       </div>
 
-      {/* CHUNK 3: SAFETY MODERATION INTERFACE (Report Incident CTA) */}
+      {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
       <div className="w-full">
         <button 
           onClick={togglePinMode}

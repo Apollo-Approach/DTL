@@ -63,7 +63,7 @@ function OnboardingWizard() {
       <main className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
         {step === 1 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What's your poison?</h1>
+            <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What&apos;s your poison?</h1>
             <p className="text-zinc-400 text-sm mb-8 font-medium">Select all that apply.</p>
             <div className="grid grid-cols-2 gap-4">
               {['Beer', 'Wine', 'Cocktails', 'Mocktails'].map((opt) => (
@@ -107,7 +107,7 @@ function OnboardingWizard() {
 
         {step === 3 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What's the frequency?</h1>
+            <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What&apos;s the frequency?</h1>
             <p className="text-zinc-400 text-sm mb-8 font-medium">Choose your ideal atmosphere.</p>
             <div className="grid grid-cols-2 gap-4">
               {['Live Bands', 'DJs / Electronic', 'Chill Lounge', 'High Energy'].map((opt) => (

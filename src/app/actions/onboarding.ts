@@ -3,8 +3,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { Preferences } from '@/types';
 
-export async function savePreferences(preferencesData: any) {
+export async function savePreferences(preferencesData: Preferences) {
   const supabase = await createClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();

@@ -19,16 +19,17 @@ export async function GET() {
     
     // Pass through real data only — no simulated telemetry.
     // Estimated capacity is derived from polygon area (approx 1 spot per 25m²).
-    const features = geojson.features.map((feature: any) => {
-      const areaM2 = feature.properties.area_m2 || 0;
+    const features = geojson.features.map((feature: GeoJSON.Feature) => {
+      const props = feature.properties || {};
+      const areaM2 = props.area_m2 || 0;
       const estimatedSpots = areaM2 > 0 ? Math.round(areaM2 / 25) : null;
       
       return {
         ...feature,
         properties: {
-          ...feature.properties,
+          ...props,
           estimatedSpots,
-          honkZoneId: feature.properties.HonkZoneID || null
+          honkZoneId: props.HonkZoneID || null
         }
       };
     });

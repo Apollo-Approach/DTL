@@ -19,13 +19,16 @@ export const VenueSchema = z.object({
   location: z.union([
     GeoJSONPointSchema,
     z.object({ lat: z.number(), lng: z.number(), address: z.string().optional() })
-  ]),
+  ]).optional(),
+  lat: z.number(),
+  lng: z.number(),
   address: z.string().optional(),
   type: z.enum(['bar', 'restaurant', 'club', 'venue', 'other', 'church']).optional(),
   status: z.nativeEnum(VenueStatus).optional(),
   operating_hours: z.any().optional(), // JSONB
   website_url: z.string().optional(),
   late_night_eligible: z.boolean().optional(),
+  offerings: z.any().optional(),
 });
 
 export const EventSchema = z.object({
@@ -60,9 +63,11 @@ export const SafetyIncidentSchema = z.object({
   type: z.nativeEnum(IncidentType),
   status: z.nativeEnum(IncidentStatus),
   description: z.string().optional(),
-  reportedAt: z.string().datetime(),
-  resolvedAt: z.string().datetime().optional(),
-  location: z.object({ lat: z.number(), lng: z.number() }),
+  reported_at: z.string().datetime(),
+  resolved_at: z.string().datetime().optional(),
+  location: z.object({ lat: z.number(), lng: z.number() }).optional(),
+  lat: z.number(),
+  lng: z.number()
 });
 
 export type GeoJSONPoint = z.infer<typeof GeoJSONPointSchema>;
@@ -102,4 +107,24 @@ export interface Promotion {
   discount_value: string;
   active_until: string;
   total_claims_allowed: number;
+}
+
+export interface Habits {
+  affordability?: number | string; // From form inputs it arrives as a string, coerced to number server-side
+  schedule?: string;
+  [key: string]: unknown;
+}
+
+export interface Offerings {
+  drinks?: string[];
+  cuisine?: string[];
+  vibe?: string[];
+  habits?: Habits;
+}
+
+export interface Preferences {
+  drinks?: string[];
+  cuisine?: string[];
+  vibe?: string[];
+  habits?: Habits;
 }

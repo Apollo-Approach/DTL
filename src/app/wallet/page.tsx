@@ -7,6 +7,20 @@ export const metadata = {
   title: 'My Wallet | DTL Nightly',
 };
 
+interface UserPass {
+  id: string;
+  status: string;
+  issued_at: string;
+  promotions: {
+    title: string;
+    discount_value: string;
+    venues: {
+      name: string;
+      address: string;
+    } | null;
+  } | null;
+}
+
 export default async function WalletPage() {
   const supabase = await createClient();
 
@@ -35,8 +49,8 @@ export default async function WalletPage() {
     .eq('user_id', user.id)
     .order('issued_at', { ascending: false });
 
-  const activePasses = passes?.filter(p => p.status === 'ISSUED') || [];
-  const pastPasses = passes?.filter(p => p.status !== 'ISSUED') || [];
+  const activePasses = (passes as unknown as UserPass[])?.filter(p => p.status === 'ISSUED') || [];
+  const pastPasses = (passes as unknown as UserPass[])?.filter(p => p.status !== 'ISSUED') || [];
 
   return (
     <div className="min-h-screen bg-black text-white font-sans pb-24">
@@ -62,7 +76,7 @@ export default async function WalletPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-8 mb-16">
-            {activePasses.map((pass: any) => (
+            {activePasses.map((pass: UserPass) => (
               <div key={pass.id} className="relative bg-zinc-950 border border-white/20 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.15)]">
                 {/* Visual styling */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-400 to-purple-500" />
@@ -99,7 +113,7 @@ export default async function WalletPage() {
           <section>
             <h2 className="text-xl font-bold uppercase tracking-widest border-b border-white/10 pb-4 mb-6">History</h2>
             <div className="flex flex-col gap-4">
-              {pastPasses.map((pass: any) => (
+              {pastPasses.map((pass: UserPass) => (
                 <div key={pass.id} className="flex justify-between items-center p-4 bg-zinc-900/50 border border-white/5 rounded-lg opacity-60 grayscale">
                   <div>
                     <h4 className="font-bold text-sm text-white">{pass.promotions?.title}</h4>

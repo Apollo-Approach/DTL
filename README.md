@@ -6,7 +6,7 @@
     <em>Built for real-time transit monitoring and frictionless community safety reporting.</em>
   </p>
   
-  [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat&logo=next.js)](https://nextjs.org/)
+  [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js)](https://nextjs.org/)
   [![MapLibre GL](https://img.shields.io/badge/MapLibre-GL-blue?style=flat&logo=maplibre)](https://maplibre.org/)
   [![Supabase](https://img.shields.io/badge/Supabase-Database-3ecf8e?style=flat&logo=supabase)](https://supabase.com/)
   [![License](https://img.shields.io/badge/License-MIT-green.svg)](#)
@@ -51,7 +51,7 @@ No sign-ups. No tracking. Just the city at your fingertips.
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Frontend** | [Next.js 14](https://nextjs.org/) | Core React framework and API routing |
+| **Frontend** | [Next.js 16](https://nextjs.org/) | Core React framework and API routing |
 | **Mapping** | [MapLibre GL JS](https://maplibre.org/) | WebGL engine for rendering the 3D digital twin |
 | **Backend** | [Supabase](https://supabase.com/) | PostgreSQL database and Anonymous Auth |
 | **Styling** | [Tailwind CSS](https://tailwindcss.com/) | Utility-first styling for a premium UI |
@@ -97,6 +97,8 @@ No sign-ups. No tracking. Just the city at your fingertips.
 ## 🧠 Architectural Quirks & Notes
 - **LTC Feed Caching**: The external LTC proxy servers aggressively cache their JSON payload. The backend `/api/civic/transit` route appends a cache-busting timestamp (`?t=${Date.now()}`) to the upstream fetch to ensure fresh coordinates.
 - **MapLibre 3D Math**: When generating dynamic 3D polygons (like our bus bodies), the exterior coordinate ring must be mapped in a strictly **CLOCKWISE** winding order. Counter-clockwise rings are interpreted as holes and will not extrude!
+- **Automated Data Ingestion**: We utilize a stealthy background Python crawler (`camoufox`) paired with a local Llamabox (Qwen 3.5) to parse unstructured venue websites into strict JSON `offerings`. This powers the client-side `matchScore` algorithm without requiring manual data entry.
+- **Strict Build Integrity**: The Next.js build pipeline strictly enforces TypeScript typings and ESLint rules via the modern flat `eslint.config.mjs` format. External Python and scraper directories are explicitly ignored to prevent Vercel CI/CD failures.
 
 ---
 <div align="center">

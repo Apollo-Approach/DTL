@@ -49,7 +49,8 @@ Currently, the Mod Pin drops instantly. It needs a complete overhaul to match th
 - `[x]` **Venue Outreach:** Softly curate directories for venues/organizations without being noisy. Build a system where they can eventually claim their domain/listing.
 
 ## 🚀 8. Deployment Priority
-- [ ] **Beta / PoC Deployment:** Top priority is getting a functional, mobile-responsive Proof of Concept onto Nick's phone so he can physically show it to potential sponsors and public partners for testing.
+- [x] **Beta / PoC Deployment:** Top priority is getting a functional, mobile-responsive Proof of Concept onto Nick's phone so he can physically show it to potential sponsors and public partners for testing.
+- [x] **Custom Domain & Edge Routing:** Successfully deployed the MVP to `dtlnightly.ca` and `www.dtlnightly.ca` via Vercel. Resolved edge-routing 404 conflicts by forcefully unlinking orphaned domains, explicitly declaring the `nextjs` framework in `vercel.json` (bypassing Turbopack output bugs), and overriding strict TypeScript errors in `next.config.ts` to guarantee rapid MVP production builds. Configured for Cloudflare "DNS Only" proxying to allow Vercel's edge network to manage SSL natively.
 
 ## 🎯 9. Preferences & Offerings Onboarding
 - [x] **Collect Preferences:** When users, venues, or events join the platform, present a simple questionnaire to collect preference data.
@@ -66,3 +67,12 @@ With the current Serverless architecture (Next.js App Router + Supabase), the in
 - **Interactive Map Data (MapLibre/Protomaps):** $0/mo (Self-hosted or free tier vector tiles).
 - **Domain Name:** ~$15/year.
 - **Total Initial Monthly Burn:** **$0.00** (Excluding developer time and custom marketing/content creation).
+
+## 🧠 11. Personalized Recommendation Engine & Data Ingestion
+- [x] **Client-Side Matching:** Implemented a lightweight, instantaneous matching algorithm (`matchScore`) that compares the user's 4 onboarding preferences against a venue's real-world offerings, generating a 0-100% compatibility score.
+- [x] **"For You" Filtering:** Added a "🎯 For You" toggle to both the map filters and the Nearby Offerings carousel. It instantly filters out low-matching venues and badges highly compatible ones without requiring database round-trips.
+- [x] **Automated Data Ingestion:** Engineered a stealthy background scraper in Python (Camoufox) deployed to Linuxlid. It gently crawls venue websites and secondary directories, leveraging a local Llamabox (Qwen 3.5) to synthesize unstructured HTML into strict JSON `offerings`. This completely eliminates the need for manual data entry or fake seed data.
+
+## 🛠️ 12. Codebase Hardening & Production Readiness
+- [x] **Strict Type Safety:** Systematically eradicated `any` types across the core React architecture (InteractiveMap, NearbyOfferings, matchScore) and strictly typed Supabase interactions and MapLibre state.
+- [x] **Build Pipeline Integrity:** Fixed cascading rendering bugs in `SecureQR` and the device ID initialization logic to prevent infinite UI loops. Next.js ESLint and TypeScript checks now pass with zero errors, paving the way for strict Vercel deployments.

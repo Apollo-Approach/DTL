@@ -64,7 +64,7 @@ export default function VenuePortal() {
               <User size={16} />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-bold">Barney's Lounge</span>
+              <span className="text-sm font-bold">Barney&apos;s Lounge</span>
               <span className="text-xs text-neutral-500">Owner</span>
             </div>
           </div>

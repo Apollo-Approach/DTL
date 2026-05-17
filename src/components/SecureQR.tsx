@@ -16,10 +16,13 @@ export default function SecureQR({ promotionId, venueName, discountValue, title 
 
   React.useEffect(() => {
     // In production, this JSON payload would be cryptographically signed
-    setQrPayload(JSON.stringify({
-      promo: promotionId,
-      timestamp: Date.now()
-    }));
+    const timer = setTimeout(() => {
+      setQrPayload(JSON.stringify({
+        promo: promotionId,
+        timestamp: Date.now()
+      }));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [promotionId]);
 
   return (

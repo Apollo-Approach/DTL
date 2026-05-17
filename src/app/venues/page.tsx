@@ -91,7 +91,7 @@ export default async function VenuesDirectory() {
       
       {/* Footer CTA */}
       <section className="border-t border-white/5 py-16 px-6 text-center">
-        <h3 className="text-xl font-bold text-zinc-300 mb-4">Don't see your business?</h3>
+        <h3 className="text-xl font-bold text-zinc-300 mb-4">Don&apos;t see your business?</h3>
         <p className="text-zinc-500 text-sm mb-6 max-w-sm mx-auto">
           We are actively curating the definitive directory of downtown London.
         </p>

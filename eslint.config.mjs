@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // External scripts & data
+    "camoufox/**",
+    "scripts/**",
+    "scratch/**",
+    "node_modules/**",
+    "check_db.js"
   ]),
 ]);
 

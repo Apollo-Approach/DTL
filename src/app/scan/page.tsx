@@ -7,17 +7,6 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 export default function ScanPage() {
   const [status, setStatus] = useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: 'Awaiting Scan...' });
   const [isScanning, setIsScanning] = useState(true);
-  const [deviceId, setDeviceId] = useState('');
-
-  // Generate a persistent mock device ID for the MVP
-  useEffect(() => {
-    let id = localStorage.getItem('dtl_device_id');
-    if (!id) {
-      id = 'dev-' + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('dtl_device_id', id);
-    }
-    setDeviceId(id);
-  }, []);
 
   const handleScan = async (text: string) => {
     if (!text || !isScanning) return;
@@ -28,10 +17,16 @@ export default function ScanPage() {
       const payload = JSON.parse(text);
       if (!payload.promo) throw new Error("Invalid Format");
 
+      let currentDeviceId = localStorage.getItem('dtl_device_id');
+      if (!currentDeviceId) {
+        currentDeviceId = 'dev-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('dtl_device_id', currentDeviceId);
+      }
+
       const res = await fetch('/api/promotions/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ promoId: payload.promo, deviceId })
+        body: JSON.stringify({ promoId: payload.promo, deviceId: currentDeviceId })
       });
 
       const data = await res.json();
@@ -63,8 +58,12 @@ export default function ScanPage() {
           {isScanning ? (
             <div className="rounded-xl overflow-hidden border-2 border-purple-500/50 aspect-square">
               <Scanner 
-                onResult={(text) => handleScan(text)} 
-                onError={(error) => console.error(error)} 
+                onScan={(detectedCodes) => {
+                  if (detectedCodes.length > 0) {
+                    handleScan(detectedCodes[0].rawValue);
+                  }
+                }}
+                onError={(error: unknown) => console.error(error)} 
               />
             </div>
           ) : (

@@ -4,7 +4,6 @@ import React, { useRef, useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Event } from '@/types';
-
 interface MapProps {
   initialCenter?: [number, number];
   initialZoom?: number;
@@ -46,7 +45,7 @@ export default function Map({
 
     const initializeMarkers = () => {
       events.forEach(event => {
-        if (event.venue && event.venue.location.coordinates) {
+        if (event.lng && event.lat) {
           const el = document.createElement('div');
           // Using explicit styles as a fallback for Tailwind dynamic values in injected elements
           el.style.width = '16px';
@@ -58,11 +57,11 @@ export default function Map({
           el.style.cursor = 'pointer';
           
           new maplibregl.Marker({ element: el })
-            .setLngLat(event.venue.location.coordinates as [number, number])
+            .setLngLat([event.lng, event.lat])
             .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
               `<div style="color: #000; padding: 4px;">
                 <h3 style="font-weight: bold; margin: 0;">${event.name}</h3>
-                <p style="margin: 0; font-size: 14px;">${event.venue.name}</p>
+                <p style="margin: 0; font-size: 14px;">${event.description || ''}</p>
               </div>`
             ))
             .addTo(map.current!);

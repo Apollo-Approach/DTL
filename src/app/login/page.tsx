@@ -29,9 +29,10 @@ function LoginForm() {
       if (error) {
         throw error;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An error occurred during sign in.';
       console.error('Google login error:', err);
-      setErrorMsg(err.message || 'An error occurred during sign in.');
+      setErrorMsg(message);
       setLoading(false);
     }
   };

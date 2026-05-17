@@ -31,9 +31,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+lint_report*
+tsc_report*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -41,3 +44,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# === SECRET VAULT (local reference only) ===
+Keys/
+
+# === CREDENTIALS ===
+client_secret_*.json
+
+# === VENDORED / DOWNLOADED DATA ===
+camoufox/
+google_transit/
+google_transit.zip
+
+# === SUPABASE LOCAL STATE ===
+supabase/.temp/
