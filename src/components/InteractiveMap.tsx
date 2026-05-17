@@ -675,15 +675,32 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Filter Venues by Search and Late Night and For You
+    // Filter Venues by Search, Category, Late Night, and For You
     const filteredVenues = venues.filter(venue => {
       if (searchQuery && !venue.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-      if (activeFilter === 'LateNight' && !venue.late_night_eligible) return false;
+      
+      // Category filter — map filter bubble values to venue.type
+      if (activeFilter) {
+        switch (activeFilter) {
+          case 'Nightlife':
+            if (venue.type !== 'club' && venue.type !== 'bar') return false;
+            break;
+          case 'Eatery':
+            if (venue.type !== 'restaurant') return false;
+            break;
+          case 'Stage':
+            if (venue.type !== 'venue') return false;
+            break;
+          case 'LateNight':
+            if (!venue.late_night_eligible) return false;
+            break;
+        }
+      }
+
       if (forYou && preferences) {
         const score = calculateMatchScore(venue.offerings, preferences);
         if (score < 20) return false;
       }
-      // Note: dateFilter will be applied when we introduce Events in Step 3
       return true;
     });
 
