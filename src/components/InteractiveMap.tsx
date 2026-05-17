@@ -154,9 +154,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             id: 'parking-extrusion',
             type: 'fill-extrusion',
             source: 'parking-source',
+            layout: { visibility: 'none' },
             paint: {
-              'fill-extrusion-color': '#06b6d4', // Distinct Cyan — clearly not a building
-              'fill-extrusion-height': 1,         // Subtle border wall
+              'fill-extrusion-color': '#06b6d4',
+              'fill-extrusion-height': 1,
               'fill-extrusion-base': 0,
               'fill-extrusion-opacity': 0.85
             }
@@ -169,6 +170,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             id: 'parking-outline-glow',
             type: 'line',
             source: 'parking-source',
+            layout: { visibility: 'none' },
             paint: {
               'line-color': '#06b6d4',
               'line-width': 2,
@@ -185,6 +187,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             type: 'symbol',
             source: 'parking-source',
             layout: {
+              visibility: 'none',
               'text-field': '🅿️',
               'text-size': 16,
               'text-allow-overlap': false,
@@ -210,11 +213,12 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             type: 'line',
             source: 'on-street-parking-source',
             layout: {
+              visibility: 'none',
               'line-join': 'round',
               'line-cap': 'round'
             },
             paint: {
-              'line-color': '#3b82f6', // Bright Blue
+              'line-color': '#3b82f6',
               'line-width': 4,
               'line-dasharray': [2, 2],
               'line-opacity': 0.8
