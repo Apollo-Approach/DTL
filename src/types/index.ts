@@ -21,27 +21,32 @@ export const VenueSchema = z.object({
     z.object({ lat: z.number(), lng: z.number(), address: z.string().optional() })
   ]),
   address: z.string().optional(),
-  type: z.enum(['bar', 'restaurant', 'club', 'venue', 'other']).optional(),
+  type: z.enum(['bar', 'restaurant', 'club', 'venue', 'other', 'church']).optional(),
   status: z.nativeEnum(VenueStatus).optional(),
+  operating_hours: z.any().optional(), // JSONB
+  website_url: z.string().optional(),
+  late_night_eligible: z.boolean().optional(),
 });
 
 export const EventSchema = z.object({
   id: z.string(),
   name: z.string(),
-  venueId: z.string(),
-  description: z.string().optional(),
-  startTime: z.string().datetime(), // ISO 8601
-  endTime: z.string().datetime(), // ISO 8601
-  pricing: z.union([z.number(), z.boolean()]),
-  categories: z.array(z.enum(['live-music', 'dj', 'comedy', 'special', 'food-drink', 'other'])),
-  venue: VenueSchema.optional(),
+  venue_id: z.string(),
+  start_time: z.string().datetime(), // ISO 8601
+  end_time: z.string().datetime(), // ISO 8601
+  is_free: z.boolean(),
+  price: z.number(),
+  categories: z.array(z.string()),
+  description: z.string(),
+  ticket_url: z.string().nullable().optional(),
+  lat: z.number(),
+  lng: z.number()
 });
 
 export enum IncidentType {
-  WELLNESS_CHECK = 'WELLNESS_CHECK',
-  DE_ESCALATION = 'DE_ESCALATION',
-  MEDICAL_MINOR = 'MEDICAL_MINOR',
-  GENERAL_ASSIST = 'GENERAL_ASSIST'
+  OPEN_AIR_DRUGS = 'OPEN_AIR_DRUGS',
+  CRISIS_PERSON = 'CRISIS_PERSON',
+  CROWD_ESCALATION = 'CROWD_ESCALATION'
 }
 
 export enum IncidentStatus {

@@ -33,6 +33,15 @@ No sign-ups. No tracking. Just the city at your fingertips.
 ### 🧭 Offline Pedestrian Routing
 - Deep integration with [Organic Maps](https://organicmaps.app/) allows users to calculate safe, well-lit walking routes offline, preserving battery and data when navigating downtown at night.
 
+### 🎟️ Dynamic Couponing (Venue-Pays Model)
+- **Targeted Promotions**: Users receive unique, single-use QR codes based on their personal preferences (drinks, vibe, budget).
+- **Crowd Control Engine**: DTL Nightly leverages these coupons to divert foot traffic away from congested areas to partner venues.
+- **Secure Redemptions**: Venue staff use a secure `/venue` portal to scan passes, automatically billing the venue a small lead-generation fee to fund the street team.
+
+### 🏢 Comprehensive Nightlife Directory
+- **Brutalist Venue Profiles**: High-contrast, data-dense pages showcasing upcoming live events, scraped directly from localized event feeds.
+- **Seamless Onboarding**: Google OAuth powers the user portal. A sleek 4-step wizard captures exact preferences to power the recommendation engine.
+
 ### 🗺️ Accessible Data
 - **Clean-First UI**: Overwhelming venue data is hidden by default. The map remains uncluttered until explicitly queried via the filter panel.
 

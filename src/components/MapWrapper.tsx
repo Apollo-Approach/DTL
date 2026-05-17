@@ -14,8 +14,10 @@ const InteractiveMap = dynamic(() => import('./InteractiveMap'), {
 interface MapWrapperProps {
   venues: any[];
   incidents: any[];
+  events: any[];
+  mode?: 'public' | 'crisis';
 }
 
-export default function MapWrapper({ venues, incidents }: MapWrapperProps) {
-  return <InteractiveMap venues={venues} incidents={incidents} />;
+export default function MapWrapper({ venues, incidents, events, mode = 'public' }: MapWrapperProps) {
+  return <InteractiveMap venues={venues} incidents={incidents} events={events} mode={mode} />;
 }

@@ -1,5 +1,7 @@
-// src/app/api/civic/transit/route.ts
 import { NextResponse } from 'next/server';
+import tripMappingRaw from '@/lib/data/trip_mapping.json';
+
+const tripMapping = tripMappingRaw as Record<string, string>;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; 
@@ -39,8 +41,12 @@ export async function GET() {
         const timestamp = v.timestamp || nowSec;
         const isDelayed = (nowSec - timestamp) > 180; // Delayed if ping is older than 3 mins
 
+        const tripId = v.trip?.tripId || v.trip?.trip_id;
+        const headsign = tripId ? tripMapping[tripId] : null;
+
         buses.push({
           id: v.vehicle?.id || entity.id,
+          headsign: headsign,
           routeId: v.trip?.routeId || v.trip?.route_id || 'LTC',
           targetLng: v.position.longitude,
           targetLat: v.position.latitude,
