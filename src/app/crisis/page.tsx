@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import MapWrapper from '@/components/MapWrapper';
 import { createClient } from '@/lib/supabase/client';
 import { Venue, SafetyIncident } from '@/types';
+import { verifyCrisisPin, checkCrisisStatus, lockCrisis } from '@/app/actions/crisis';
 
 export default function CrisisCloudPage() {
   const [unlocked, setUnlocked] = useState(false);
@@ -12,6 +13,13 @@ export default function CrisisCloudPage() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [incidents, setIncidents] = useState<SafetyIncident[]>([]);
   const supabase = React.useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    // Check if they are already unlocked via secure HTTP-only cookie
+    checkCrisisStatus().then(status => {
+      if (status) setUnlocked(true);
+    });
+  }, []);
 
   useEffect(() => {
     if (unlocked) {
@@ -25,11 +33,12 @@ export default function CrisisCloudPage() {
     }
   }, [unlocked, supabase]);
 
-  const handlePinInput = (num: string) => {
+  const handlePinInput = async (num: string) => {
     const newPin = pin + num;
     setPin(newPin);
     if (newPin.length === 4) {
-      if (newPin === (process.env.NEXT_PUBLIC_CRISIS_PIN || '')) { // Set NEXT_PUBLIC_CRISIS_PIN in .env.local
+      const { success } = await verifyCrisisPin(newPin);
+      if (success) {
         setUnlocked(true);
       } else {
         setTimeout(() => setPin(''), 500); // Reset on error
@@ -83,7 +92,7 @@ export default function CrisisCloudPage() {
           <span className="text-2xl">🛡️</span>
           <h1 className="text-red-400 font-black tracking-widest uppercase text-lg">Crisis Cloud</h1>
         </div>
-        <button onClick={() => {setUnlocked(false); setPin('');}} className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1 rounded">Lock</button>
+        <button onClick={async () => { await lockCrisis(); setUnlocked(false); setPin(''); }} className="text-sm text-neutral-400 hover:text-white border border-neutral-700 px-3 py-1 rounded">Lock</button>
       </div>
       
       {/* Map Content */}

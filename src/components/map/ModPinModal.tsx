@@ -4,6 +4,7 @@
 import React from 'react';
 import maplibregl from 'maplibre-gl';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { escapeHtml } from './mapHelpers';
 
 interface ModPinModalProps {
   pendingPinLocation: { lng: number; lat: number };
@@ -65,8 +66,8 @@ export default function ModPinModal({
           new maplibregl.Popup({ offset: 25, closeButton: true }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 6px; min-width: 180px;">
               <h3 style="margin: 0 0 8px 0; font-weight: bold; font-size: 14px; color: #dc2626;">🚨 Mod Pin Logged</h3>
-              <p style="margin: 0 0 4px 0; font-size: 12px; color: #444;"><strong>Type:</strong> ${pinCategory}</p>
-              <p style="margin: 0 0 12px 0; font-size: 12px; color: #444;"><strong>Desc:</strong> "${pinDescription || 'No description'}"</p>
+              <p style="margin: 0 0 4px 0; font-size: 12px; color: #444;"><strong>Type:</strong> ${escapeHtml(pinCategory)}</p>
+              <p style="margin: 0 0 12px 0; font-size: 12px; color: #444;"><strong>Desc:</strong> "${escapeHtml(pinDescription) || 'No description'}"</p>
               <p style="margin: 0; font-size: 11px; color: #666; font-style: italic;">Liaison team dispatched.</p>
             </div>`
           )

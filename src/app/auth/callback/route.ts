@@ -10,7 +10,9 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code');
   // `next` parameter allows us to redirect to a specific page after login
   // (e.g., redirecting back to the venue profile page after claiming)
-  const next = requestUrl.searchParams.get('next') || '/';
+  const rawNext = requestUrl.searchParams.get('next') || '/';
+  // Prevent open redirect — only allow relative paths, block protocol-relative URLs
+  const next = (rawNext.startsWith('/') && !rawNext.startsWith('//')) ? rawNext : '/';
 
   if (code) {
     const supabase = await createClient();

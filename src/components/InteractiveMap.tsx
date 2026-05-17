@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
 import { Venue, Event, SafetyIncident, Preferences } from '@/types';
-import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText } from './map/mapHelpers';
+import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
 
@@ -812,8 +812,8 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
           new maplibregl.Popup({ offset: 25 }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 4px;">
               <h3 style="margin: 0; font-weight: bold; font-size: 14px; color: #d97706;">⚠️ Safety Alert</h3>
-              <p style="margin: 2px 0 4px 0; font-size: 12px; font-weight: bold; color: #444;">${incident.type.replace('_', ' ')}</p>
-              <p style="margin: 0; font-size: 11px; color: #666;">${incident.description || 'Mediator requested.'}</p>
+              <p style="margin: 2px 0 4px 0; font-size: 12px; font-weight: bold; color: #444;">${escapeHtml(incident.type.replace('_', ' '))}</p>
+              <p style="margin: 0; font-size: 11px; color: #666;">${escapeHtml(incident.description) || 'Mediator requested.'}</p>
               <p style="margin: 4px 0 0 0; font-size: 10px; color: #888;">Reported: ${new Date(incident.reported_at).toLocaleTimeString()}</p>
             </div>`
           )

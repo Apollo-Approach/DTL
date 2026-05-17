@@ -82,3 +82,17 @@ export const getDirectionText = (dir: number) => {
    if (dir === 1) return "Inbound";
    return "Unknown";
 };
+
+/**
+ * Escapes HTML characters in user-provided text to prevent XSS
+ * when rendering content in MapLibre .setHTML() popups.
+ */
+export const escapeHtml = (unsafe: string | null | undefined): string => {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
