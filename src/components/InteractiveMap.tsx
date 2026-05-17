@@ -825,21 +825,23 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
   }, [venues, incidents, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences]);
 
-  // Handle Map Decluttering
+  // Handle Map Decluttering — retail 3D buildings
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.getLayer('bia-retail-extrusion')) return;
     const map = mapRef.current;
     
-    if (activeFilter) {
-      if (activeFilter === 'All') {
-        map.setFilter('bia-retail-extrusion', null);
-      } else {
-        map.setFilter('bia-retail-extrusion', ['==', ['get', 'category'], activeFilter]);
-      }
-      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', layerToggles.retail ? 0.85 : 0);
-    } else {
+    if (activeFilter && activeFilter !== 'LateNight') {
+      // Category filter active — filter GeoJSON features by category property
+      map.setFilter('bia-retail-extrusion', ['==', ['get', 'category'], activeFilter]);
+      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0.85);
+    } else if (layerToggles.retail) {
+      // Retail toggled on (or LateNight active) — show all buildings
       map.setFilter('bia-retail-extrusion', null);
-      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', layerToggles.retail ? 0.85 : 0);
+      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0.85);
+    } else {
+      // Everything off — hide retail buildings
+      map.setFilter('bia-retail-extrusion', null);
+      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0);
     }
   }, [activeFilter, layerToggles.retail]);
 
