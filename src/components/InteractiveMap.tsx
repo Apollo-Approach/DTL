@@ -923,7 +923,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       />
 
       {/* THE 3D MAP */}
-      <div className="relative w-full h-[65vh] min-h-[450px] lg:h-[75vh] lg:min-h-[650px] max-h-[900px] rounded-xl overflow-hidden border border-neutral-800 shadow-2xl z-0">
+      <div className="relative w-full h-[85svh] min-h-[500px] lg:h-[800px] rounded-xl overflow-hidden border border-neutral-700 shadow-2xl z-0">
         <div ref={mapContainerRef} className="w-full h-full absolute inset-0" />
         
         {/* MOD PIN MODAL */}
