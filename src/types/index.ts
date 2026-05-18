@@ -49,7 +49,8 @@ export const EventSchema = z.object({
 export enum IncidentType {
   OPEN_AIR_DRUGS = 'OPEN_AIR_DRUGS',
   CRISIS_PERSON = 'CRISIS_PERSON',
-  CROWD_ESCALATION = 'CROWD_ESCALATION'
+  CROWD_ESCALATION = 'CROWD_ESCALATION',
+  SAFEWALK_SOS = 'SAFEWALK_SOS'
 }
 
 export enum IncidentStatus {

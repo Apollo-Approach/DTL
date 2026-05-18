@@ -12,6 +12,8 @@ import { Venue, Event, SafetyIncident, Preferences } from '@/types';
 import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
+import SafeWalkModal from './map/SafeWalkModal';
+import SafeWalkOverlay from './map/SafeWalkOverlay';
 
 
 
@@ -27,6 +29,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  
+  // SafeWalk State
+  const [showSafeWalkModal, setShowSafeWalkModal] = useState(false);
+  const [safeWalkExpiresAt, setSafeWalkExpiresAt] = useState<number | null>(null);
   
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -795,20 +801,33 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
     filteredIncidents.forEach((incident) => {
       if (!mapRef.current) return;
-      const el = document.createElement('div');
-      
-      // Tailwind pulsing ping animation for active safety alerts
-      el.innerHTML = `
-        <span class="relative flex h-5 w-5">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-5 w-5 bg-amber-500 border-2 border-white shadow-lg"></span>
-        </span>
-      `;
-      el.className = 'cursor-pointer';
+      let marker: maplibregl.Marker;
 
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([incident.lng, incident.lat])
-        .setPopup(
+      if (incident.type === 'SAFEWALK_SOS') {
+        // Special rendering for high-priority SOS
+        const sosEl = document.createElement('div');
+        sosEl.className = 'cursor-pointer z-50';
+        sosEl.innerHTML = `
+          <span class="relative flex h-8 w-8">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-8 w-8 bg-red-600 border-2 border-white shadow-2xl flex items-center justify-center text-sm">🚨</span>
+          </span>
+        `;
+        marker = new maplibregl.Marker({ element: sosEl }).setLngLat([incident.lng, incident.lat]);
+      } else {
+        const defaultEl = document.createElement('div');
+        // Tailwind pulsing ping animation for active safety alerts
+        defaultEl.innerHTML = `
+          <span class="relative flex h-5 w-5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-5 w-5 bg-amber-500 border-2 border-white shadow-lg"></span>
+          </span>
+        `;
+        defaultEl.className = 'cursor-pointer';
+        marker = new maplibregl.Marker({ element: defaultEl }).setLngLat([incident.lng, incident.lat]);
+      }
+
+      marker.setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 4px;">
               <h3 style="margin: 0; font-weight: bold; font-size: 14px; color: #d97706;">⚠️ Safety Alert</h3>
@@ -918,6 +937,47 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             setPinDescription={setPinDescription}
             mapRef={mapRef}
             supabase={supabase}
+          />
+        )}
+
+        {/* SafeWalk Floating Button */}
+        {!safeWalkExpiresAt && !showSafeWalkModal && (
+          <button 
+            onClick={() => setShowSafeWalkModal(true)}
+            className="absolute bottom-28 right-4 z-40 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-900/50 flex flex-col items-center justify-center transition-transform active:scale-95 border-2 border-emerald-400"
+            title="SafeWalk Timer"
+          >
+            <span className="text-xl">🛡️</span>
+            <span className="text-[9px] font-bold uppercase tracking-tighter mt-0.5">SafeWalk</span>
+          </button>
+        )}
+
+        {/* SafeWalk Modal */}
+        {showSafeWalkModal && (
+          <SafeWalkModal 
+            onCancel={() => setShowSafeWalkModal(false)}
+            onStart={(mins) => {
+              // Ask for location permission eagerly
+              if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(() => {
+                  setSafeWalkExpiresAt(Date.now() + mins * 60000);
+                  setShowSafeWalkModal(false);
+                }, (err) => {
+                  alert('SafeWalk requires Location Access to dispatch help to your location. Please enable it.');
+                });
+              } else {
+                alert('Geolocation is not supported by your browser.');
+              }
+            }}
+          />
+        )}
+
+        {/* SafeWalk Active Overlay */}
+        {safeWalkExpiresAt && (
+          <SafeWalkOverlay 
+            expiresAt={safeWalkExpiresAt}
+            onSafe={() => setSafeWalkExpiresAt(null)}
+            onExtend={(mins) => setSafeWalkExpiresAt(prev => (prev ? prev + mins * 60000 : null))}
           />
         )}
       </div>
