@@ -64,7 +64,7 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white p-6 md:p-8 font-sans flex flex-col max-w-[1600px] mx-auto">
+    <main className="min-h-screen bg-black text-white p-6 md:p-8 font-sans flex flex-col max-w-[1600px] w-full mx-auto overflow-x-hidden">
       <Script
         id="schema-org-venues"
         type="application/ld+json"
@@ -113,7 +113,7 @@ export default async function Home() {
 
         {/* CHUNK 2 & 3: MAP, SEARCH, AND SAFETY MODERATION */}
         {/* The InteractiveMap component will handle the Neon Bubbles (Chunk 2) and Mod Pin CTA (Chunk 3) */}
-        <section className="w-full relative z-10 flex flex-col gap-4">
+        <section className="w-full max-w-full min-w-0 relative z-10 flex flex-col gap-4">
           <MapWrapper venues={venues} incidents={incidents} events={events} preferences={preferences} />
         </section>
 
