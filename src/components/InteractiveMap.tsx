@@ -923,7 +923,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       />
 
       {/* THE 3D MAP */}
-      <div className="relative w-full h-[500px] lg:h-[700px] rounded-xl overflow-hidden border border-neutral-800 shadow-2xl z-0">
+      <div className="relative w-full h-[65vh] min-h-[450px] lg:h-[75vh] lg:min-h-[650px] max-h-[900px] rounded-xl overflow-hidden border border-neutral-800 shadow-2xl z-0">
         <div ref={mapContainerRef} className="w-full h-full absolute inset-0" />
         
         {/* MOD PIN MODAL */}
@@ -944,7 +944,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         {!safeWalkExpiresAt && !showSafeWalkModal && (
           <button 
             onClick={() => setShowSafeWalkModal(true)}
-            className="absolute bottom-28 right-4 z-40 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-900/50 flex flex-col items-center justify-center transition-transform active:scale-95 border-2 border-emerald-400"
+            className="absolute bottom-10 right-4 z-40 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-900/50 flex flex-col items-center justify-center transition-transform active:scale-95 border-2 border-emerald-400"
             title="SafeWalk Timer"
           >
             <span className="text-xl">🛡️</span>
