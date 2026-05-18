@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 const InteractiveMap = dynamic(() => import('./InteractiveMap'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full min-h-[500px] flex items-center justify-center bg-neutral-900 rounded-xl border border-neutral-800 animate-pulse">
+    <div className="w-full h-[85svh] min-h-[500px] lg:h-[800px] flex items-center justify-center bg-neutral-900 rounded-xl border border-neutral-800 animate-pulse">
       <span className="text-neutral-500 font-semibold">Loading MapLibre WebGL Engine...</span>
     </div>
   ),

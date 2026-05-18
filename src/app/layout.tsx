@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   description: "Real-time transit, nightlife, and community safety for downtown London, Ontario.",
 };
 
+import type { Viewport } from 'next';
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
