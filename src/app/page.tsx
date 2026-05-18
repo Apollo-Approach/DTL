@@ -106,7 +106,7 @@ export default async function Home() {
       <SafetyTicker />
 
       {/* Mobile-First Content Flow */}
-      <div className="flex flex-col gap-8 flex-grow">
+      <div className="flex flex-col gap-8 flex-grow w-full min-w-0">
         
         {/* CHUNK 1: PROXIMAL OFFERINGS SLIDES */}
         <NearbyOfferings venues={venues} promos={promos} preferences={preferences} />

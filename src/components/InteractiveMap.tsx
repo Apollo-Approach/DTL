@@ -906,7 +906,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   }, [supabase, router]);
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex flex-col gap-4 w-full min-w-0">
       <MapFilterBar
         layerToggles={layerToggles}
         setLayerToggles={setLayerToggles}

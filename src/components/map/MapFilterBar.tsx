@@ -56,7 +56,7 @@ export default function MapFilterBar({
   return (
     <>
       {/* NEON BUBBLES (Instagram Stories Style Map Filters) */}
-      <div className="w-full">
+      <div className="w-full min-w-0 overflow-hidden">
         <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
         <div className="flex overflow-x-auto gap-4 pb-4 px-1 snap-x scrollbar-hide">
           

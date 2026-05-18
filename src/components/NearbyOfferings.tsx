@@ -31,7 +31,7 @@ export default function NearbyOfferings({ venues, promos, preferences }: NearbyO
   }, [venues, preferences, forYou]);
 
   return (
-    <section className="w-full">
+    <section className="w-full min-w-0 overflow-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-neutral-800 pb-2 mb-4 gap-4">
         <h2 className="text-xl md:text-2xl font-bold flex items-center gap-3">
           Nearby Offerings
