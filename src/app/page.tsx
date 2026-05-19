@@ -119,6 +119,9 @@ export default async function Home() {
             <Link href="/login?next=/dashboard" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-purple-900/50">
               Partner as Venue
             </Link>
+            <Link href="/venues" className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white font-bold py-3 px-6 rounded-xl transition-colors text-center">
+              View Venue Directory
+            </Link>
             <button className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white font-bold py-3 px-6 rounded-xl transition-colors">
               Apply for Street Team
             </button>
