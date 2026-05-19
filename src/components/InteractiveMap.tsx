@@ -748,11 +748,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       // Category filter — map filter bubble values to venue.type
       switch (activeFilter) {
         case 'Nightlife':
-          return venue.type === 'club' || venue.type === 'bar';
+          return ['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(venue.type || '');
         case 'Eatery':
-          return venue.type === 'restaurant';
+          return ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(venue.type || '');
         case 'Stage':
-          return venue.type === 'venue' || venue.type === 'church';
+          return ['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(venue.type || '');
         case 'LateNight':
           return !!venue.late_night_eligible;
         default:
@@ -760,15 +760,32 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       }
     });
 
-    // Draw Venues (Purple for permanent, Cyan for Pop-up)
+    // Draw Venues
     filteredVenues.forEach((venue) => {
       if (!mapRef.current) return;
       const el = document.createElement('div');
       const isPopUp = venue.status === 'POP_UP';
+
+      // Dynamic Marker Coloring based on Industry Standards
+      let markerColor = '#64748b'; // Default slate
+      const vType = venue.type || '';
+      if (['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(vType)) {
+        markerColor = '#d946ef'; // Nightlife (Fuchsia)
+      } else if (['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(vType)) {
+        markerColor = '#f97316'; // Eatery (Orange)
+      } else if (['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(vType)) {
+        markerColor = '#eab308'; // Stage (Yellow)
+      }
+
+      // Override with Cyan if it's a Pop-Up
+      if (isPopUp) {
+        markerColor = '#06b6d4';
+      }
+
       // Modern Map Pin Iconography for Venues
       el.className = 'group relative flex items-center justify-center cursor-pointer';
       el.innerHTML = `
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="${isPopUp ? '#06b6d4' : '#b026ff'}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-lg group-hover:scale-110 transition-transform origin-bottom pointer-events-none">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="${markerColor}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-lg group-hover:scale-110 transition-transform origin-bottom pointer-events-none">
           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
           <circle cx="12" cy="10" r="3" fill="white"/>
         </svg>
@@ -786,14 +803,14 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         .setPopup(
           new maplibregl.Popup({ offset: 25, closeButton: true, closeOnClick: true, className: 'venue-popup' }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 8px; min-width: 180px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: #b026ff;">${venue.name}</h3>
+              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: ${markerColor};">${venue.name}</h3>
               <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${venue.address}</p>
               ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
               ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
               ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
               <button 
                 onclick="window.requestSafeWalk(${venue.lng}, ${venue.lat})" 
-                style="margin-top: 12px; width: 100%; padding: 8px; background: linear-gradient(to right, #b026ff, #06b6d4); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"
+                style="margin-top: 12px; width: 100%; padding: 8px; background: linear-gradient(to right, ${markerColor}, #06b6d4); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"
               >
                 🛡️ Request SafeWalk
               </button>
@@ -1004,7 +1021,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [responderLocations, setResponderLocations] = useState<Record<string, {lat: number, lng: number, role: string, timestamp: number}>>({});
 
   useEffect(() => {
-    const canBroadcast = ['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole);
+    // All M-tier roles can participate in presence (M1-M5)
+    const canBroadcast = ['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole);
+    // Only M3+ can SEE all other responders
+    const canViewAll = ['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole);
+
     if (!canBroadcast) return;
 
     const presenceChannel = supabase.channel('realtime-responders', {
@@ -1012,11 +1033,17 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     });
 
     presenceChannel.on('presence', { event: 'sync' }, () => {
+      if (!canViewAll) return; // M1/M2 broadcast but don't see others
       const state = presenceChannel.presenceState();
+      const STALE_MS = 5 * 60 * 1000; // 5 minutes
+      const now = Date.now();
       const newLocations: Record<string, any> = {};
       Object.keys(state).forEach(key => {
         if (state[key] && state[key].length > 0) {
-          newLocations[key] = state[key][0];
+          const entry = state[key][0] as any;
+          // Prune stale presence (>5 min old)
+          if (entry.timestamp && (now - entry.timestamp) > STALE_MS) return;
+          newLocations[key] = entry;
         }
       });
       setResponderLocations(newLocations);
@@ -1045,7 +1072,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     };
   }, [supabase, userRole, broadcastLocation, session]);
 
-  // 5. Render Responder Markers
+  // 5. Render Responder Markers (differentiated by M-tier)
   useEffect(() => {
     if (!mapRef.current) return;
     
@@ -1055,17 +1082,43 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     }
     const markers: maplibregl.Marker[] = [];
 
-    Object.entries(responderLocations).forEach(([userId, data]) => {
+    const ROLE_CONFIG: Record<string, { bg: string; border: string; icon: string; label: string }> = {
+      'm1_observer': { bg: '#64748b', border: '#94a3b8', icon: '👁️', label: 'Observer' },
+      'm2_responder': { bg: '#0891b2', border: '#22d3ee', icon: '🛡️', label: 'Responder' },
+      'm3_admin': { bg: '#6366f1', border: '#a5b4fc', icon: '⚡', label: 'Admin' },
+      'm4_police': { bg: '#2563eb', border: '#93c5fd', icon: '👮', label: 'Liaison' },
+      'm5_sysadmin': { bg: '#dc2626', border: '#fca5a5', icon: '💻', label: 'Sysadmin' },
+    };
+
+    const STALE_MS = 5 * 60 * 1000;
+    const now = Date.now();
+
+    Object.entries(responderLocations).forEach(([uid, data]) => {
       // Don't render ourselves (the map's native GeolocateControl handles our blue dot)
-      if (userId === session?.user?.id) return;
+      if (uid === session?.user?.id) return;
+      
+      const config = ROLE_CONFIG[data.role] || ROLE_CONFIG['m2_responder'];
+      const isStale = data.timestamp && (now - data.timestamp) > STALE_MS;
       
       const el = document.createElement('div');
-      el.className = 'w-6 h-6 bg-indigo-500 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-[10px] text-white font-bold opacity-80';
-      el.innerText = data.role === 'm4_police' ? '👮' : (data.role === 'm5_sysadmin' ? '💻' : '🛡️');
+      el.style.cssText = `
+        width: 32px; height: 32px; border-radius: 50%;
+        background: ${config.bg}; border: 3px solid ${config.border};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; box-shadow: 0 0 12px ${config.bg}88;
+        opacity: ${isStale ? '0.35' : '0.9'};
+        transition: opacity 0.3s;
+      `;
+      el.innerText = config.icon;
       
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([data.lng, data.lat])
-        .setPopup(new maplibregl.Popup({ offset: 15 }).setHTML(`<div style="color:black;font-size:12px;font-weight:bold;padding:2px;">${data.role}</div>`))
+        .setPopup(new maplibregl.Popup({ offset: 18 }).setHTML(
+          `<div style="color:black;font-size:12px;padding:4px;">
+            <strong>${config.icon} ${config.label}</strong>
+            ${isStale ? '<br/><span style="color:orange;font-size:10px;">⚠ Stale signal</span>' : ''}
+          </div>`
+        ))
         .addTo(mapRef.current!);
       
       markers.push(marker);
@@ -1095,7 +1148,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
       {session && !session.user.is_anonymous && (
         <div className="w-full flex flex-col gap-2">
-          {['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
+          {['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
             <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
               <div>
                 <h4 className="text-white font-bold text-sm">Broadcast Location</h4>

@@ -23,7 +23,7 @@ export const VenueSchema = z.object({
   lat: z.number(),
   lng: z.number(),
   address: z.string().optional(),
-  type: z.enum(['bar', 'restaurant', 'club', 'venue', 'other', 'church']).optional(),
+  type: z.string().optional(),
   status: z.nativeEnum(VenueStatus).optional(),
   operating_hours: z.any().optional(), // JSONB
   website_url: z.string().optional(),
@@ -68,6 +68,8 @@ export const SafetyIncidentSchema = z.object({
   reported_at: z.string().datetime(),
   reported_by: z.string().uuid().optional(),
   resolved_at: z.string().datetime().optional(),
+  dispatched_to: z.string().uuid().optional(),
+  dispatched_at: z.string().datetime().optional(),
   location: z.object({ lat: z.number(), lng: z.number() }).optional(),
   lat: z.number(),
   lng: z.number()
@@ -119,10 +121,11 @@ export interface Habits {
 }
 
 export interface Offerings {
-  drinks?: string[];
-  cuisine?: string[];
-  vibe?: string[];
-  habits?: Habits;
+  menu_highlights?: string[];
+  pricing_intel?: string;
+  upcoming_events?: string[];
+  vibe_analysis?: string;
+  maps_grounding_lite?: any;
 }
 
 export interface Preferences {
