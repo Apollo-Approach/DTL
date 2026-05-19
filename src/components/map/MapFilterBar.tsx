@@ -62,8 +62,11 @@ export default function MapFilterBar({
       {/* NEON BUBBLES (Instagram Stories Style Map Filters) */}
       <div className="w-full min-w-0 overflow-hidden">
         <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
-        <div className="flex flex-wrap gap-2 pb-4 px-1">
-          
+        
+        {/* Wrapper for mask fade-out effect */}
+        <div className="relative w-full [mask-image:linear-gradient(to_right,transparent_0%,black_5%,black_95%,transparent_100%)]">
+          <div className="flex overflow-x-auto flex-nowrap gap-3 pb-4 px-4 snap-x snap-mandatory scrollbar-hide items-start">
+            
           {/* Marketing Bubbles (Hidden for M-Tier Mods to reduce cognitive load) */}
           {!userRole.startsWith('m') && (
             <>
@@ -187,6 +190,7 @@ export default function MapFilterBar({
             </button>
           )}
 
+          </div>
         </div>
       </div>
 
