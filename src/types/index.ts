@@ -50,7 +50,8 @@ export enum IncidentType {
   OPEN_AIR_DRUGS = 'OPEN_AIR_DRUGS',
   CRISIS_PERSON = 'CRISIS_PERSON',
   CROWD_ESCALATION = 'CROWD_ESCALATION',
-  SAFEWALK_SOS = 'SAFEWALK_SOS'
+  SAFEWALK_SOS = 'SAFEWALK_SOS',
+  PANIC_ALARM = 'PANIC_ALARM'
 }
 
 export enum IncidentStatus {
@@ -128,4 +129,5 @@ export interface Preferences {
   cuisine?: string[];
   vibe?: string[];
   habits?: Habits;
+  autoRoute?: boolean;
 }

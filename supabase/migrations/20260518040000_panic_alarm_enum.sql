@@ -1,0 +1,2 @@
+-- Add PANIC_ALARM to incident_type ENUM
+ALTER TYPE incident_type ADD VALUE IF NOT EXISTS 'PANIC_ALARM';

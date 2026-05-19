@@ -10,6 +10,8 @@ interface LayerToggles {
   incidents: boolean;
   retail: boolean;
   parking: boolean;
+  events: boolean;
+  specials: boolean;
 }
 
 interface MapFilterBarProps {
@@ -25,6 +27,7 @@ interface MapFilterBarProps {
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   dateFilter: string;
   setDateFilter: React.Dispatch<React.SetStateAction<string>>;
+  userRole?: string;
 }
 
 export default function MapFilterBar({
@@ -34,6 +37,7 @@ export default function MapFilterBar({
   preferences, mode,
   searchQuery, setSearchQuery,
   dateFilter, setDateFilter,
+  userRole = 'citizen',
 }: MapFilterBarProps) {
 
   /**
@@ -60,30 +64,68 @@ export default function MapFilterBar({
         <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
         <div className="flex overflow-x-auto gap-4 pb-4 px-1 snap-x scrollbar-hide">
           
-          {/* Transit Bubble */}
-          <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, transit: !prev.transit }))} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.transit ? 'bg-emerald-900/50 border-[3px] border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🚌
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
-          </button>
+          {/* Marketing Bubbles (Hidden for M-Tier Mods to reduce cognitive load) */}
+          {!userRole.startsWith('m') && (
+            <>
+              {/* NIGHTLY Bubble */}
+              <button 
+                onClick={() => setLayerToggles(prev => ({ ...prev, events: !prev.events }))} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.events ? 'bg-pink-900/50 border-[3px] border-pink-400 shadow-[0_0_15px_rgba(244,114,182,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🎫
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.events ? 'text-pink-400' : 'text-neutral-500'}`}>Nightly</span>
+              </button>
 
-          {/* Parking Bubble */}
-          <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, parking: !prev.parking }))} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.parking ? 'bg-blue-900/50 border-[3px] border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🅿️
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.parking ? 'text-blue-400' : 'text-neutral-500'}`}>Parking</span>
-          </button>
+              {/* SPECIALS Bubble */}
+              <button 
+                onClick={() => setLayerToggles(prev => ({ ...prev, specials: !prev.specials }))} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.specials ? 'bg-orange-900/50 border-[3px] border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🏷️
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.specials ? 'text-orange-400' : 'text-neutral-500'}`}>Specials</span>
+              </button>
+            </>
+          )}
 
           {mode === 'public' && (
             <>
+              {/* Clubs/Bars Bubble */}
+              <button 
+                onClick={() => toggleCategory('Nightlife')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🪩
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Clubs/Bars</span>
+              </button>
+
+              {/* Eateries Bubble */}
+              <button 
+                onClick={() => toggleCategory('Eatery')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🍔
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eateries</span>
+              </button>
+
+              {/* Arts Bubble */}
+              <button 
+                onClick={() => toggleCategory('Stage')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🎭
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Arts</span>
+              </button>
+
               {/* For You Bubble */}
               {preferences && (
                 <button 
@@ -97,40 +139,7 @@ export default function MapFilterBar({
                 </button>
               )}
 
-              {/* Nightlife Bubble */}
-              <button 
-                onClick={() => toggleCategory('Nightlife')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🪩
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Clubs</span>
-              </button>
-
-              {/* Eateries Bubble */}
-              <button 
-                onClick={() => toggleCategory('Eatery')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🍔
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
-              </button>
-
-              {/* Stages Bubble */}
-              <button 
-                onClick={() => toggleCategory('Stage')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🎸
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
-              </button>
-
-              {/* Late Night Bubble — filters venues by late_night_eligible, not a GeoJSON category */}
+              {/* Late Night Bubble */}
               <button 
                 onClick={() => toggleCategory('LateNight')} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
@@ -143,48 +152,45 @@ export default function MapFilterBar({
             </>
           )}
 
-          {/* Mod Pins Bubble */}
+          {/* Parking Bubble */}
           <button 
-            onClick={() => setLayerToggles(prev => ({ ...prev, incidents: !prev.incidents }))} 
+            onClick={() => setLayerToggles(prev => ({ ...prev, parking: !prev.parking }))} 
             className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
           >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.incidents ? 'bg-red-900/50 border-[3px] border-red-400 shadow-[0_0_15px_rgba(248,113,113,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-              🚨
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.parking ? 'bg-blue-900/50 border-[3px] border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+              🅿️
             </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.incidents ? 'text-red-400' : 'text-neutral-500'}`}>Alerts</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.parking ? 'text-blue-400' : 'text-neutral-500'}`}>Parking</span>
           </button>
+
+          {/* Transit Bubble */}
+          <button 
+            onClick={() => setLayerToggles(prev => ({ ...prev, transit: !prev.transit }))} 
+            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+          >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.transit ? 'bg-emerald-900/50 border-[3px] border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+              🚌
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
+          </button>
+
+          {/* Mod Pins Bubble (Visible to all M-Tiers) */}
+          {userRole.startsWith('m') && (
+            <button 
+              onClick={() => setLayerToggles(prev => ({ ...prev, incidents: !prev.incidents }))} 
+              className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+            >
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-300 ${layerToggles.incidents ? 'bg-red-900/50 border-[3px] border-red-400 shadow-[0_0_15px_rgba(248,113,113,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                🚨
+              </div>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.incidents ? 'text-red-400' : 'text-neutral-500'}`}>Alerts</span>
+            </button>
+          )}
 
         </div>
       </div>
 
-      {/* SEARCH & CALENDAR */}
-      {mode === 'public' && (
-        <div className="w-full flex gap-2 px-1">
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-neutral-500" />
-            </div>
-            <input
-              type="text"
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-neutral-500 focus:outline-none focus:border-cyan-500 transition-colors"
-              placeholder="Search venues or events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="relative w-1/3 min-w-[120px]">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="h-4 w-4 text-neutral-500" />
-            </div>
-            <input
-              type="date"
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl py-3 pl-10 pr-2 text-white text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
+      {/* SEARCH & CALENDAR HAVE BEEN MOVED TO A SEPARATE PAGE */}
     </>
   );
 }

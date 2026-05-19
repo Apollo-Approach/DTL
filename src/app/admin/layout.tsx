@@ -28,8 +28,8 @@ export default async function AdminLayout({
   }
 
   // 3. Enforce RBAC
-  if (profile.role !== 'admin' && profile.role !== 'responder') {
-    // If they are just a 'citizen', deny access.
+  if (!['m2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'].includes(profile.role)) {
+    // If they are just a 'citizen' or 'm1_observer', deny access.
     // In a real app, you might redirect to a "Not Authorized" page.
     redirect('/?error=unauthorized');
   }

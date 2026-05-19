@@ -14,8 +14,7 @@ import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
 import SafeWalkModal from './map/SafeWalkModal';
 import SafeWalkOverlay from './map/SafeWalkOverlay';
-
-
+import IncidentActionPanel from './crisis/IncidentActionPanel';
 
 interface InteractiveMapProps {
   venues: Venue[]; 
@@ -41,7 +40,12 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   
   // Auth & UI State
   const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<string>('citizen');
   
+  // Crisis Cloud State
+  const [selectedIncident, setSelectedIncident] = useState<SafetyIncident | null>(null);
+  const [localIncidentUpdates, setLocalIncidentUpdates] = useState<Record<string, SafetyIncident>>({});
+
   // Map Decluttering Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
@@ -53,7 +57,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     transit: true,
     incidents: true,
     retail: false,
-    parking: false
+    parking: false,
+    events: true,
+    specials: false
   });
 
   const [isPinMode, setIsPinMode] = useState(false);
@@ -65,26 +71,53 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [pinDescription, setPinDescription] = useState<string>('');
 
   const togglePinMode = () => {
-    const newState = !pinModeRef.current;
-    pinModeRef.current = newState;
-    setIsPinMode(newState);
-    if (mapRef.current) {
-      mapRef.current.getCanvas().style.cursor = newState ? 'crosshair' : '';
+    if (!session || session.user.is_anonymous) {
+      alert("You must be logged in to report an incident.");
+      return;
+    }
+    
+    // Check for location services
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          const newState = !pinModeRef.current;
+          pinModeRef.current = newState;
+          setIsPinMode(newState);
+          if (mapRef.current) {
+            mapRef.current.getCanvas().style.cursor = newState ? 'crosshair' : '';
+          }
+        },
+        (err) => {
+          alert("Location Services must be enabled to report an incident. Please enable them and try again.");
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
     }
   };
 
   // 0. Initialize Auth State
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         supabase.auth.signInAnonymously();
       } else {
         setSession(session);
+        if (!session.user.is_anonymous) {
+          const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+          if (data) setUserRole(data.role);
+        }
       }
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+      if (session && !session.user.is_anonymous) {
+        const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+        if (data) setUserRole(data.role);
+      } else {
+        setUserRole('citizen');
+      }
     });
 
     return () => {
@@ -128,6 +161,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         bearing: -17.6,
       });
       mapRef.current.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+      mapRef.current.addControl(new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true
+      }), 'top-right');
 
       mapRef.current.on('load', () => {
         const map = mapRef.current;
@@ -725,6 +762,12 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         ${isPopUp ? '<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>' : ''}
       `;
 
+      if (preferences?.autoRoute) {
+        el.addEventListener('click', () => {
+          window.requestSafeWalk(venue.lng, venue.lat);
+        });
+      }
+
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([venue.lng, venue.lat])
         .setPopup(
@@ -750,11 +793,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     });
 
     // Draw Events (🎫)
-    const filteredEvents = events.filter(evt => {
+    const filteredEvents = layerToggles.events ? events.filter(evt => {
       if (searchQuery && !evt.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       if (dateFilter && !evt.start_time.startsWith(dateFilter)) return false;
       return true;
-    });
+    }) : [];
 
     filteredEvents.forEach((evt) => {
       if (!mapRef.current) return;
@@ -770,6 +813,12 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       const ticketCTA = evt.ticket_url 
         ? `<a href="${evt.ticket_url}" target="_blank" style="display:block; margin-top: 12px; width: 100%; text-align: center; padding: 6px; background: #db2777; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">🎟️ BUY TICKETS</a>`
         : `<div style="margin-top: 12px; width: 100%; text-align: center; padding: 6px; background: #10b981; color: white; border-radius: 6px; font-size: 12px; font-weight: bold;">FREE EVENT</div>`;
+
+      if (preferences?.autoRoute) {
+        el.addEventListener('click', () => {
+          window.requestSafeWalk(evt.lng, evt.lat);
+        });
+      }
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([evt.lng, evt.lat])
@@ -787,9 +836,32 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       markersRef.current.push(marker);
     });
 
-    // Draw Active Safety Incidents (Pulsing Amber)
-    const filteredIncidents = incidents.filter(incident => {
+    const displayIncidents = incidents.map(inc => localIncidentUpdates[inc.id] || inc);
+
+    const filteredIncidents = displayIncidents.filter((incident) => {
       if (!layerToggles.incidents) return false;
+
+      // Role-based visibility logic
+      if (userRole === 'citizen') {
+        // Citizens do not see incident pins on the map
+        return false;
+      }
+
+      if (userRole === 'm1_observer') {
+        // M1 only sees Panics and Safewalk SOS
+        if (incident.type !== 'PANIC_ALARM' && incident.type !== 'SAFEWALK_SOS') {
+          return false;
+        }
+        // M1 does not see resolved incidents
+        if (incident.status === 'RESOLVED') return false;
+      }
+
+      if (userRole === 'm2_responder' || userRole === 'm3_admin' || userRole === 'm4_police' || userRole === 'm5_sysadmin') {
+        // M2+ see all incidents, including resolved ones
+        // So no filter applied here based on status or type
+      }
+
+      // Filter by time if needed (e.g., hiding very old resolved pins)
       if (timeFilter !== 'all') {
         const incidentTime = new Date(incident.reported_at).getTime();
         const hoursDiff = (Date.now() - incidentTime) / (1000 * 60 * 60);
@@ -803,14 +875,14 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       if (!mapRef.current) return;
       let marker: maplibregl.Marker;
 
-      if (incident.type === 'SAFEWALK_SOS') {
-        // Special rendering for high-priority SOS
+      if (incident.type === 'SAFEWALK_SOS' || incident.type === 'PANIC_ALARM') {
+        // Special rendering for high-priority SOS and Panics
         const sosEl = document.createElement('div');
         sosEl.className = 'cursor-pointer z-50';
         sosEl.innerHTML = `
           <span class="relative flex h-8 w-8">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-8 w-8 bg-red-600 border-2 border-white shadow-2xl flex items-center justify-center text-sm">🚨</span>
+            <span class="relative inline-flex rounded-full h-8 w-8 ${incident.status === 'DISPATCHED' ? 'bg-cyan-500' : 'bg-red-600'} border-2 border-white shadow-2xl flex items-center justify-center text-sm">🚨</span>
           </span>
         `;
         marker = new maplibregl.Marker({ element: sosEl }).setLngLat([incident.lng, incident.lat]);
@@ -819,30 +891,39 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         // Tailwind pulsing ping animation for active safety alerts
         defaultEl.innerHTML = `
           <span class="relative flex h-5 w-5">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-5 w-5 bg-amber-500 border-2 border-white shadow-lg"></span>
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${incident.status === 'DISPATCHED' ? 'bg-cyan-400' : 'bg-amber-400'} opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-5 w-5 ${incident.status === 'DISPATCHED' ? 'bg-cyan-500' : 'bg-amber-500'} border-2 border-white shadow-lg"></span>
           </span>
         `;
         defaultEl.className = 'cursor-pointer';
         marker = new maplibregl.Marker({ element: defaultEl }).setLngLat([incident.lng, incident.lat]);
       }
 
-      marker.setPopup(
-          new maplibregl.Popup({ offset: 25 }).setHTML(
-            `<div style="color: #000; font-family: sans-serif; padding: 4px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 14px; color: #d97706;">⚠️ Safety Alert</h3>
-              <p style="margin: 2px 0 4px 0; font-size: 12px; font-weight: bold; color: #444;">${escapeHtml(incident.type.replace('_', ' '))}</p>
-              <p style="margin: 0; font-size: 11px; color: #666;">${escapeHtml(incident.description) || 'Mediator requested.'}</p>
-              <p style="margin: 4px 0 0 0; font-size: 10px; color: #888;">Reported: ${new Date(incident.reported_at).toLocaleTimeString()}</p>
-            </div>`
-          )
-        )
-        .addTo(mapRef.current);
+      if (mode === 'crisis') {
+        // In crisis mode, clicking opens the action panel
+        marker.getElement().addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelectedIncident(incident);
+        });
+      } else {
+        // Public mode shows the static popup
+        marker.setPopup(
+            new maplibregl.Popup({ offset: 25 }).setHTML(
+              `<div style="color: #000; font-family: sans-serif; padding: 4px;">
+                <h3 style="margin: 0; font-weight: bold; font-size: 14px; color: ${incident.status === 'DISPATCHED' ? '#06b6d4' : '#d97706'};">⚠️ Safety Alert ${incident.status === 'DISPATCHED' ? '(Dispatched)' : ''}</h3>
+                <p style="margin: 2px 0 4px 0; font-size: 12px; font-weight: bold; color: #444;">${escapeHtml(incident.type.replace('_', ' '))}</p>
+                <p style="margin: 0; font-size: 11px; color: #666;">${escapeHtml(incident.description) || 'Mediator requested.'}</p>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: #888;">Reported: ${new Date(incident.reported_at).toLocaleTimeString()}</p>
+              </div>`
+            )
+          );
+      }
 
+      marker.addTo(mapRef.current);
       markersRef.current.push(marker);
     });
 
-  }, [venues, incidents, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences]);
+  }, [venues, incidents, localIncidentUpdates, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences, mode]);
 
   // Handle Map Decluttering — retail 3D buildings
   useEffect(() => {
@@ -905,6 +986,81 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     };
   }, [supabase, router]);
 
+  // 4. Supabase Realtime Responder Presence
+  const [broadcastLocation, setBroadcastLocation] = useState(false); // Default off until they opt in
+  const [responderLocations, setResponderLocations] = useState<Record<string, {lat: number, lng: number, role: string, timestamp: number}>>({});
+
+  useEffect(() => {
+    const canBroadcast = ['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole);
+    if (!canBroadcast) return;
+
+    const presenceChannel = supabase.channel('realtime-responders', {
+      config: { presence: { key: session?.user?.id || 'unknown' } }
+    });
+
+    presenceChannel.on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel.presenceState();
+      const newLocations: Record<string, any> = {};
+      Object.keys(state).forEach(key => {
+        if (state[key] && state[key].length > 0) {
+          newLocations[key] = state[key][0];
+        }
+      });
+      setResponderLocations(newLocations);
+    }).subscribe();
+
+    let watchId: number;
+    if (broadcastLocation && 'geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition((pos) => {
+        presenceChannel.track({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          role: userRole,
+          timestamp: Date.now()
+        });
+      }, (err) => console.error("Geolocation watch error:", err), { enableHighAccuracy: true });
+    } else {
+      // Untrack if they toggle it off while channel is active
+      if (presenceChannel.state === 'joined') {
+        presenceChannel.untrack();
+      }
+    }
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [supabase, userRole, broadcastLocation, session]);
+
+  // 5. Render Responder Markers
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    // Cleanup old responder markers
+    if ((mapRef.current as any)._responderMarkers) {
+      (mapRef.current as any)._responderMarkers.forEach((m: maplibregl.Marker) => m.remove());
+    }
+    const markers: maplibregl.Marker[] = [];
+
+    Object.entries(responderLocations).forEach(([userId, data]) => {
+      // Don't render ourselves (the map's native GeolocateControl handles our blue dot)
+      if (userId === session?.user?.id) return;
+      
+      const el = document.createElement('div');
+      el.className = 'w-6 h-6 bg-indigo-500 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-[10px] text-white font-bold opacity-80';
+      el.innerText = data.role === 'm4_police' ? '👮' : (data.role === 'm5_sysadmin' ? '💻' : '🛡️');
+      
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([data.lng, data.lat])
+        .setPopup(new maplibregl.Popup({ offset: 15 }).setHTML(`<div style="color:black;font-size:12px;font-weight:bold;padding:2px;">${data.role}</div>`))
+        .addTo(mapRef.current!);
+      
+      markers.push(marker);
+    });
+
+    (mapRef.current as any)._responderMarkers = markers;
+  }, [responderLocations, session]);
+
   return (
     <div className="flex flex-col gap-4 w-full min-w-0">
       <MapFilterBar
@@ -920,10 +1076,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         setSearchQuery={setSearchQuery}
         dateFilter={dateFilter}
         setDateFilter={setDateFilter}
+        userRole={userRole}
       />
 
       {/* THE 3D MAP */}
-      <div className="relative w-full max-w-full h-[85svh] min-h-[500px] lg:h-[800px] rounded-xl overflow-hidden border border-neutral-700 shadow-2xl z-0">
+      <div className="relative w-full max-w-full h-[60svh] min-h-[400px] lg:h-[600px] rounded-xl overflow-hidden border border-neutral-700 shadow-2xl z-0">
         <div ref={mapContainerRef} className="w-full h-full absolute inset-0" />
         
         {/* MOD PIN MODAL */}
@@ -980,17 +1137,47 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             onExtend={(mins) => setSafeWalkExpiresAt(prev => (prev ? prev + mins * 60000 : null))}
           />
         )}
+
+        {/* Crisis Mode: Incident Action Panel */}
+        {selectedIncident && (
+          <IncidentActionPanel
+            incident={localIncidentUpdates[selectedIncident.id] || selectedIncident}
+            onClose={() => setSelectedIncident(null)}
+            onUpdate={(updatedIncident) => {
+              setLocalIncidentUpdates(prev => ({ ...prev, [updatedIncident.id]: updatedIncident }));
+            }}
+            userRole={userRole}
+            currentUserId={session?.user?.id}
+          />
+        )}
       </div>
 
       {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
-      <div className="w-full">
-        <button 
-          onClick={togglePinMode}
-          className={`w-full py-4 rounded-xl font-black text-lg shadow-xl transition-all border-2 ${isPinMode ? 'bg-red-900/80 text-red-100 border-red-500 animate-pulse shadow-red-500/20' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-500'}`}
-        >
-          {isPinMode ? '🎯 TAP MAP TO DROP PIN' : '⚠️ REPORT STREET INCIDENT'}
-        </button>
-      </div>
+      {session && !session.user.is_anonymous && (
+        <div className="w-full flex flex-col gap-2">
+          {['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
+            <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
+              <div>
+                <h4 className="text-white font-bold text-sm">Broadcast Location</h4>
+                <p className="text-xs text-neutral-400">Share your live GPS with other Responders</p>
+              </div>
+              <button 
+                onClick={() => setBroadcastLocation(!broadcastLocation)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${broadcastLocation ? 'bg-indigo-500' : 'bg-neutral-600'}`}
+              >
+                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${broadcastLocation ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          )}
+
+          <button 
+            onClick={togglePinMode}
+            className={`w-full py-4 rounded-xl font-black text-lg shadow-xl transition-all border-2 ${isPinMode ? 'bg-red-900/80 text-red-100 border-red-500 animate-pulse shadow-red-500/20' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-500'}`}
+          >
+            {isPinMode ? '🎯 TAP MAP TO DROP PIN' : '⚠️ REPORT STREET INCIDENT'}
+          </button>
+        </div>
+      )}
 
     </div>
   );
