@@ -737,29 +737,27 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     const filteredVenues = venues.filter(venue => {
       if (searchQuery && !venue.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
-      // Category filter — map filter bubble values to venue.type
-      if (activeFilter) {
-        switch (activeFilter) {
-          case 'Nightlife':
-            if (venue.type !== 'club' && venue.type !== 'bar') return false;
-            break;
-          case 'Eatery':
-            if (venue.type !== 'restaurant') return false;
-            break;
-          case 'Stage':
-            if (venue.type !== 'venue') return false;
-            break;
-          case 'LateNight':
-            if (!venue.late_night_eligible) return false;
-            break;
-        }
-      }
-
       if (forYou && preferences) {
         const score = calculateMatchScore(venue.offerings, preferences);
-        if (score < 20) return false;
+        if (score >= 20) return true;
       }
-      return true;
+
+      // If no category is selected, hide venues to prevent map clutter
+      if (!activeFilter) return false;
+
+      // Category filter — map filter bubble values to venue.type
+      switch (activeFilter) {
+        case 'Nightlife':
+          return venue.type === 'club' || venue.type === 'bar';
+        case 'Eatery':
+          return venue.type === 'restaurant';
+        case 'Stage':
+          return venue.type === 'venue' || venue.type === 'church';
+        case 'LateNight':
+          return !!venue.late_night_eligible;
+        default:
+          return false;
+      }
     });
 
     // Draw Venues (Purple for permanent, Cyan for Pop-up)
@@ -770,11 +768,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       // Modern Map Pin Iconography for Venues
       el.className = 'group relative flex items-center justify-center cursor-pointer';
       el.innerHTML = `
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="${isPopUp ? '#06b6d4' : '#b026ff'}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-lg group-hover:scale-110 transition-transform origin-bottom">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="${isPopUp ? '#06b6d4' : '#b026ff'}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-lg group-hover:scale-110 transition-transform origin-bottom pointer-events-none">
           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
           <circle cx="12" cy="10" r="3" fill="white"/>
         </svg>
-        ${isPopUp ? '<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>' : ''}
+        ${isPopUp ? '<span class="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>' : ''}
       `;
 
       if (preferences?.autoRoute) {
@@ -786,16 +784,16 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([venue.lng, venue.lat])
         .setPopup(
-          new maplibregl.Popup({ offset: 25 }).setHTML(
-            `<div style="color: #000; font-family: sans-serif; padding: 4px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 14px;">${venue.name}</h3>
-              <p style="margin: 4px 0 0 0; font-size: 11px; color: #444;">${venue.address}</p>
-              ${venue.operating_hours ? `<p style="margin: 4px 0 0 0; font-size: 10px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
-              ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:block; margin: 4px 0 0 0; font-size: 10px; color: #06b6d4;">🔗 Website</a>` : ''}
-              ${isPopUp ? '<span style="display:inline-block; margin-top:4px; padding:2px 6px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
+          new maplibregl.Popup({ offset: 25, closeButton: true, closeOnClick: true, className: 'venue-popup' }).setHTML(
+            `<div style="color: #000; font-family: sans-serif; padding: 8px; min-width: 180px;">
+              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: #b026ff;">${venue.name}</h3>
+              <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${venue.address}</p>
+              ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
+              ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
+              ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
               <button 
                 onclick="window.requestSafeWalk(${venue.lng}, ${venue.lat})" 
-                style="margin-top: 12px; width: 100%; padding: 6px; background: linear-gradient(to right, #b026ff, #06b6d4); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"
+                style="margin-top: 12px; width: 100%; padding: 8px; background: linear-gradient(to right, #b026ff, #06b6d4); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"
               >
                 🛡️ Request SafeWalk
               </button>
