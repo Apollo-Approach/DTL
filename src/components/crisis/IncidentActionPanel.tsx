@@ -27,7 +27,7 @@ export default function IncidentActionPanel({ incident, onClose, onUpdate, userR
     try {
       const res = await updateIncidentStatus(incident.id, newStatus);
       if (res.success) {
-        onUpdate({ ...incident, status: newStatus });
+        onUpdate({ ...incident, status: newStatus as any });
         if (newStatus === 'RESOLVED') {
           onClose();
         }
@@ -123,7 +123,7 @@ export default function IncidentActionPanel({ incident, onClose, onUpdate, userR
           onClose={() => setShowResolutionModal(false)}
           onSuccess={() => {
             setShowResolutionModal(false);
-            onUpdate({ ...incident, status: 'RESOLVED' });
+            onUpdate({ ...incident, status: 'RESOLVED' as any, resolved_at: new Date().toISOString() });
             onClose();
           }}
         />
