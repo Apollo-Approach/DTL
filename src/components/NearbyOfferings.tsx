@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import SecureQR from '@/components/SecureQR';
+import VenueDetailModal from '@/components/VenueDetailModal';
 
 import { Venue, Promotion, Preferences } from '@/types';
 
@@ -15,6 +16,7 @@ import { calculateMatchScore } from '@/lib/matchScore';
 
 export default function NearbyOfferings({ venues, promos, preferences }: NearbyOfferingsProps) {
   const [forYou, setForYou] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
 
   // Compute matched venues
   const displayVenues = useMemo(() => {
@@ -68,17 +70,18 @@ export default function NearbyOfferings({ venues, promos, preferences }: NearbyO
             return (
               <li 
                 key={venue.id} 
+                onClick={() => setSelectedVenue(venue)}
                 className={`min-w-[300px] shrink-0 snap-center p-5 bg-neutral-900 border ${
                   forYou && (venue.matchScore ?? 0) >= 80 
                     ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
                     : isPopUp 
                       ? 'border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.1)]' 
                       : 'border-neutral-800'
-                } rounded-xl hover:border-purple-500 transition-colors relative overflow-hidden flex flex-col`}
+                } rounded-xl hover:border-purple-500 transition-all hover:scale-[1.02] cursor-pointer relative overflow-hidden flex flex-col group`}
               >
                 <article className="flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-1">
-                    <h3 className="text-xl font-bold text-neutral-100 pr-4">{venue.name}</h3>
+                    <h3 className="text-xl font-bold text-neutral-100 pr-4 group-hover:text-purple-400 transition-colors">{venue.name}</h3>
                     
                     {/* Tags Container */}
                     <div className="flex flex-col gap-1 items-end shrink-0">
@@ -105,29 +108,27 @@ export default function NearbyOfferings({ venues, promos, preferences }: NearbyO
                     {venue.description}
                   </p>
 
-                  {/* Secure Ticket Accordion */}
-                  {venuePromos.map((promo: Promotion) => (
-                    <details key={promo.id} className="mt-auto group">
-                      <summary className="list-none cursor-pointer bg-gradient-to-r from-purple-600/20 to-cyan-500/20 border border-purple-500/30 rounded-lg p-3 text-sm font-bold text-purple-300 hover:text-white transition-colors flex items-center justify-between outline-none">
-                        🎁 {promo.discount_value}
-                        <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded-full group-open:hidden shadow-lg shadow-purple-500/50">Reveal</span>
-                      </summary>
-                      <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <SecureQR 
-                          promotionId={promo.id}
-                          venueName={venue.name}
-                          discountValue={promo.discount_value}
-                          title={promo.title}
-                        />
-                      </div>
-                    </details>
-                  ))}
+                  <div className="mt-auto text-xs font-bold text-cyan-400 flex items-center justify-between border-t border-neutral-800 pt-3">
+                    <span>Click for details & hours</span>
+                    {venuePromos.length > 0 && (
+                      <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded border border-purple-500/30">
+                        🎁 {venuePromos.length} Offer{venuePromos.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 </article>
               </li>
             );
           })}
         </ul>
       )}
+
+      {/* Render Modal */}
+      <VenueDetailModal 
+        venue={selectedVenue} 
+        promos={selectedVenue ? promos.filter(p => p.venue_id === selectedVenue.id) : []} 
+        onClose={() => setSelectedVenue(null)} 
+      />
     </section>
   );
 }
