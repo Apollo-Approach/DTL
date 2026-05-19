@@ -66,6 +66,7 @@ export const SafetyIncidentSchema = z.object({
   status: z.nativeEnum(IncidentStatus),
   description: z.string().optional(),
   reported_at: z.string().datetime(),
+  reported_by: z.string().uuid().optional(),
   resolved_at: z.string().datetime().optional(),
   location: z.object({ lat: z.number(), lng: z.number() }).optional(),
   lat: z.number(),

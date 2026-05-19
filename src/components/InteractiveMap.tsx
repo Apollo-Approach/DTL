@@ -764,7 +764,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
       if (preferences?.autoRoute) {
         el.addEventListener('click', () => {
-          window.requestSafeWalk(venue.lng, venue.lat);
+          (window as any).requestSafeWalk(venue.lng, venue.lat);
         });
       }
 
@@ -816,7 +816,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
       if (preferences?.autoRoute) {
         el.addEventListener('click', () => {
-          window.requestSafeWalk(evt.lng, evt.lat);
+          (window as any).requestSafeWalk(evt.lng, evt.lat);
         });
       }
 
