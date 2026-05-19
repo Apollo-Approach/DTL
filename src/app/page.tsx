@@ -71,21 +71,15 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <header className="mb-8">
+      <header className="mb-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-cyan-400 mb-4">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-cyan-400 mb-1">
               DTL Nightly
             </h1>
-            <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mb-6">
-              More culture. More coordination. More safety. More fun. <br/>
-              Discover venues, pop-ups, and live events in downtown London.
+            <p className="text-neutral-400 text-sm md:text-base max-w-2xl">
+              Are you Down to Love Downtown London?
             </p>
-            <div className="flex items-center gap-4">
-              <Link href="/venues" className="inline-flex items-center justify-center px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-full font-bold text-sm tracking-wide transition-all backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.05)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] hover:border-cyan-500/50">
-                EXPLORE VENUE DIRECTORY →
-              </Link>
-            </div>
           </div>
           
           {incidents.length > 0 && (

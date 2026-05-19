@@ -15,6 +15,8 @@ import ModPinModal from './map/ModPinModal';
 import SafeWalkModal from './map/SafeWalkModal';
 import SafeWalkOverlay from './map/SafeWalkOverlay';
 import IncidentActionPanel from './crisis/IncidentActionPanel';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 interface InteractiveMapProps {
   venues: Venue[]; 
@@ -70,29 +72,41 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [pinCategory, setPinCategory] = useState<string>('');
   const [pinDescription, setPinDescription] = useState<string>('');
 
-  const togglePinMode = () => {
+  const togglePinMode = async () => {
     if (!session || session.user.is_anonymous) {
       alert("You must be logged in to report an incident.");
       return;
     }
     
-    // Check for location services
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        () => {
-          const newState = !pinModeRef.current;
-          pinModeRef.current = newState;
-          setIsPinMode(newState);
-          if (mapRef.current) {
-            mapRef.current.getCanvas().style.cursor = newState ? 'crosshair' : '';
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location !== 'granted') {
+          const request = await Geolocation.requestPermissions();
+          if (request.location !== 'granted') {
+            alert("Location Services must be enabled to report an incident.");
+            return;
           }
-        },
-        (err) => {
-          alert("Location Services must be enabled to report an incident. Please enable them and try again.");
         }
-      );
-    } else {
-      alert("Geolocation is not supported by your browser.");
+        await Geolocation.getCurrentPosition();
+      } else {
+        if (!('geolocation' in navigator)) {
+          alert("Geolocation is not supported by your browser.");
+          return;
+        }
+        await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+      }
+      
+      const newState = !pinModeRef.current;
+      pinModeRef.current = newState;
+      setIsPinMode(newState);
+      if (mapRef.current) {
+        mapRef.current.getCanvas().style.cursor = newState ? 'crosshair' : '';
+      }
+    } catch (err) {
+      alert("Location Services must be enabled to report an incident. Please enable them and try again.");
     }
   };
 
@@ -348,6 +362,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
               'fill-extrusion-color': [
                 'case',
                 ['==', ['get', 'isDelayed'], true], '#888888', // Grey if delayed/stale
+                ['==', ['get', 'occupancyStatus'], 0], '#3b82f6', // Standard blue if empty (no green highlight)
                 '#00b296' // Default teal
               ], 
               'fill-extrusion-height': 5.4,      // Height increased by 20% (from 4.5 to 5.4)
@@ -1079,8 +1094,35 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         userRole={userRole}
       />
 
+      {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
+      {session && !session.user.is_anonymous && (
+        <div className="w-full flex flex-col gap-2">
+          {['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
+            <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
+              <div>
+                <h4 className="text-white font-bold text-sm">Broadcast Location</h4>
+                <p className="text-xs text-neutral-400">Share your live GPS with other Responders</p>
+              </div>
+              <button 
+                onClick={() => setBroadcastLocation(!broadcastLocation)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${broadcastLocation ? 'bg-indigo-500' : 'bg-neutral-600'}`}
+              >
+                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${broadcastLocation ? 'translate-x-6' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          )}
+
+          <button 
+            onClick={togglePinMode}
+            className={`w-full py-4 rounded-xl font-black text-lg shadow-xl transition-all border-2 ${isPinMode ? 'bg-red-900/80 text-red-100 border-red-500 animate-pulse shadow-red-500/20' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-500'}`}
+          >
+            {isPinMode ? '🎯 TAP MAP TO DROP PIN' : '⚠️ REPORT STREET INCIDENT'}
+          </button>
+        </div>
+      )}
+
       {/* THE 3D MAP */}
-      <div className="relative w-full max-w-full h-[60svh] min-h-[400px] lg:h-[600px] rounded-xl overflow-hidden border border-neutral-700 shadow-2xl z-0">
+      <div className="relative w-full aspect-square max-h-[75vh] rounded-xl overflow-hidden border border-neutral-700 shadow-2xl z-0">
         <div ref={mapContainerRef} className="w-full h-full absolute inset-0" />
         
         {/* MOD PIN MODAL */}
@@ -1151,34 +1193,6 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
           />
         )}
       </div>
-
-      {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
-      {session && !session.user.is_anonymous && (
-        <div className="w-full flex flex-col gap-2">
-          {['m3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
-            <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
-              <div>
-                <h4 className="text-white font-bold text-sm">Broadcast Location</h4>
-                <p className="text-xs text-neutral-400">Share your live GPS with other Responders</p>
-              </div>
-              <button 
-                onClick={() => setBroadcastLocation(!broadcastLocation)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${broadcastLocation ? 'bg-indigo-500' : 'bg-neutral-600'}`}
-              >
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${broadcastLocation ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
-            </div>
-          )}
-
-          <button 
-            onClick={togglePinMode}
-            className={`w-full py-4 rounded-xl font-black text-lg shadow-xl transition-all border-2 ${isPinMode ? 'bg-red-900/80 text-red-100 border-red-500 animate-pulse shadow-red-500/20' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-500'}`}
-          >
-            {isPinMode ? '🎯 TAP MAP TO DROP PIN' : '⚠️ REPORT STREET INCIDENT'}
-          </button>
-        </div>
-      )}
-
     </div>
   );
 }

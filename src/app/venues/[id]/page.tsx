@@ -1,9 +1,15 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createBasicClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return createBasicClient(supabaseUrl, supabaseKey);
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }) {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
   const { data: venue } = await supabase
     .from('venues_public')
     .select('name, description')
@@ -18,8 +24,17 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   };
 }
 
+export async function generateStaticParams() {
+  return [
+    { id: 'v-lmh' },
+    { id: 'v-grand' }
+  ];
+}
+
+export const dynamicParams = false;
+
 export default async function VenueProfile({ params }: { params: { id: string } }) {
-  const supabase = await createClient();
+  const supabase = getSupabaseClient();
 
   // Fetch the Venue
   const { data: venue, error: venueError } = await supabase

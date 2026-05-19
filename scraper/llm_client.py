@@ -46,7 +46,13 @@ JSON Output:
 
     try:
         logger.info(f"POSTing to Llamabox for {venue_name}...")
-        response = requests.post(LLAMABOX_URL, json=payload, timeout=60)
+        
+        headers = {}
+        api_key = os.getenv("LLAMABOX_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
+        response = requests.post(LLAMABOX_URL, json=payload, headers=headers, timeout=300)
         response.raise_for_status()
         result_text = response.json().get("content", "") + "}"
         

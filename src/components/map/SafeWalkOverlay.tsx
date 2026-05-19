@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
+import { NativeAudio } from '@capacitor-community/native-audio';
 
 interface SafeWalkOverlayProps {
   expiresAt: number;
@@ -18,11 +21,23 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
   const supabase = React.useMemo(() => createClient(), []);
 
   useEffect(() => {
-    // Create audio element for the alarm
-    audioRef.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-    audioRef.current.loop = true;
+    if (Capacitor.isNativePlatform()) {
+      NativeAudio.preload({
+        assetId: 'safewalk_alarm',
+        assetPath: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
+        isUrl: true,
+        volume: 1.0,
+      }).catch(e => console.error("NativeAudio preload err:", e));
+    } else {
+      audioRef.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+      audioRef.current.loop = true;
+    }
+    
     return () => {
-      if (audioRef.current) {
+      if (Capacitor.isNativePlatform()) {
+        NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
+        NativeAudio.unload({ assetId: 'safewalk_alarm' }).catch(() => {});
+      } else if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
@@ -38,14 +53,26 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
 
       // Warning Phase (<= 30 seconds)
       if (remaining <= 30000 && remaining > 0) {
-        setIsWarning(true);
-        if (audioRef.current && audioRef.current.paused) {
-          audioRef.current.play().catch(e => console.error('Audio play blocked:', e));
+        if (!isWarning) {
+            setIsWarning(true);
+            if (Capacitor.isNativePlatform()) {
+              NativeAudio.loop({ assetId: 'safewalk_alarm' }).catch(e => console.error(e));
+            } else {
+              if (audioRef.current && audioRef.current.paused) {
+                audioRef.current.play().catch(e => console.error('Audio play blocked:', e));
+              }
+            }
         }
       } else {
-        setIsWarning(false);
-        if (audioRef.current && !audioRef.current.paused) {
-          audioRef.current.pause();
+        if (isWarning) {
+            setIsWarning(false);
+            if (Capacitor.isNativePlatform()) {
+              NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
+            } else {
+              if (audioRef.current && !audioRef.current.paused) {
+                audioRef.current.pause();
+              }
+            }
         }
       }
 
@@ -61,32 +88,47 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
   }, [expiresAt, dispatched, isDispatching]);
 
   const dispatchSOS = async () => {
-    if (audioRef.current) audioRef.current.pause();
+    if (Capacitor.isNativePlatform()) {
+      NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
+    } else if (audioRef.current) {
+      audioRef.current.pause();
+    }
     
     try {
-      // Get Geolocation
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        
+      const sendSOS = async (lat: number, lng: number) => {
         const { error } = await supabase.rpc('insert_safety_incident', {
           p_type: 'SAFEWALK_SOS',
           p_description: 'Automatic SafeWalk Dispatch',
-          p_lng: longitude,
-          p_lat: latitude,
+          p_lng: lng,
+          p_lat: lat,
         });
-
-        if (error) {
-          console.error("SOS Dispatch failed to insert:", error);
-        }
+        if (error) console.error("SOS Dispatch failed to insert:", error);
         setDispatched(true);
-      }, (err) => {
-        console.error("SOS Dispatch failed to get location:", err);
-        // Fallback: Dispatch with no location or a default if required by RPC (RPC requires lat/lng, so this might fail if blocked)
-        // We will just alert the user.
+      };
+
+      const handleFallback = () => {
         alert('SafeWalk expired, but location access was denied. Unable to dispatch SOS.');
         setDispatched(true);
-      }, { enableHighAccuracy: true, timeout: 10000 });
-      
+      };
+
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+          await sendSOS(pos.coords.latitude, pos.coords.longitude);
+        } catch (e) {
+          console.error("Native Geolocation failed:", e);
+          handleFallback();
+        }
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          pos => sendSOS(pos.coords.latitude, pos.coords.longitude),
+          err => {
+            console.error("Web Geolocation failed:", err);
+            handleFallback();
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }
     } catch (e) {
       console.error("SOS Dispatch error:", e);
       setDispatched(true);
@@ -151,7 +193,11 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
         {/* Cancel Button */}
         <button 
           onClick={() => {
-            if (audioRef.current) audioRef.current.pause();
+            if (Capacitor.isNativePlatform()) {
+              NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
+            } else if (audioRef.current) {
+              audioRef.current.pause();
+            }
             onSafe();
           }}
           className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-full shadow-xl shadow-emerald-900/50 transition-transform active:scale-95"

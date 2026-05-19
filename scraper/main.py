@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from camoufox.sync_api import Camoufox
-from scraper import scrape_venue_data, gentle_sleep
+from scraper import scrape_venue_data, gentle_sleep, BrowserDeadError
 from llm_client import synthesize_offerings
 
 # Configure robust logging to both file and stdout
@@ -34,15 +34,22 @@ def process_venues():
     logger.info("Starting venue enrichment cycle...")
     
     try:
+        # Reset venues that were flagged as browser_crash so we can try the new safe mode
+        logger.info("Resetting previously crashed venues...")
+        try:
+            supabase.table("venues").update({"offerings": "{}"}).filter("offerings->error", "eq", '"browser_crash"').execute()
+        except Exception as e:
+            pass
+
         # Optimization 1: Database-Level Filtering
         logger.info("Querying Supabase for venues missing offerings...")
-        response = supabase.table("venues").select("id, name, website_url").is_("offerings", "null").execute()
+        response = supabase.table("venues").select("id, name, website_url").eq("offerings", "{}").execute()
         venues_to_process = response.data
                 
         logger.info(f"Found {len(venues_to_process)} venues needing enrichment.")
         
         if not venues_to_process:
-            return
+            return True
 
         # Optimization 2: Keep Browser Alive
         logger.info("Booting up Camoufox browser instance...")
@@ -55,7 +62,15 @@ def process_venues():
                 logger.info(f"--- Processing: {venue_name} ---")
                 
                 # We pass the active browser to avoid cold-booting it for every venue
-                raw_text = scrape_venue_data(venue_name, website_url, browser)
+                try:
+                    raw_text = scrape_venue_data(venue_name, website_url, browser)
+                except BrowserDeadError:
+                    logger.error(f"Browser is dead for {venue_name}. Marking as failed and aborting current batch.")
+                    try:
+                        supabase.table("venues").update({"offerings": {"error": "browser_crash"}}).eq("id", venue_id).execute()
+                    except Exception as db_e:
+                        logger.error(f"Failed to update DB for crashed venue: {db_e}")
+                    os._exit(1)
                 
                 if raw_text:
                     logger.info(f"Sending {len(raw_text)} chars to Llamabox for synthesis...")
@@ -72,12 +87,19 @@ def process_venues():
                     logger.warning(f"No text extracted for {venue_name}.")
                     
                 gentle_sleep()
+                
+        return True
             
     except Exception as e:
         logger.error(f"Error in processing loop: {e}", exc_info=True)
+        return False
 
 if __name__ == "__main__":
     while True:
-        process_venues()
-        logger.info("Cycle complete. Sleeping for 12 hours...")
-        time.sleep(12 * 60 * 60)
+        success = process_venues()
+        if success:
+            logger.info("Cycle complete. Sleeping for 12 hours...")
+            time.sleep(12 * 60 * 60)
+        else:
+            logger.info("Cycle aborted mid-way. Retrying in 10 seconds...")
+            time.sleep(10)

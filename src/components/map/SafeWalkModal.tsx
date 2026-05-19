@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { NativeAudio } from '@capacitor-community/native-audio';
 
 interface SafeWalkModalProps {
   onStart: (durationMinutes: number) => void;
@@ -11,6 +13,18 @@ export default function SafeWalkModal({ onStart, onCancel }: SafeWalkModalProps)
   const [selectedMins, setSelectedMins] = useState<number | null>(null);
 
   const playTestSound = () => {
+    if (Capacitor.isNativePlatform()) {
+      NativeAudio.preload({
+        assetId: 'safewalk_test',
+        assetPath: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
+        isUrl: true,
+        volume: 1.0,
+      }).then(() => {
+        NativeAudio.play({ assetId: 'safewalk_test' }).catch(e => console.error(e));
+      }).catch(e => console.error("NativeAudio preload test err:", e));
+      return;
+    }
+
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;

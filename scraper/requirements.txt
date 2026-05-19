@@ -3,3 +3,4 @@ playwright
 camoufox
 requests
 python-dotenv
+beautifulsoup4

@@ -15,22 +15,47 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing coordinates" }, { status: 400 });
   }
 
-  // MVP "Safe Corridor" Waypoint Logic:
-  // Instead of a direct shortest-path line (which might cross dark alleys), we force the route  
-  // to snap to the well-lit, heavily surveilled intersection of Dundas St & Richmond St.
-  const safeIntersection = [-81.2497, 42.9836]; 
+  // Safe Corridor Waypoint:
+  // Force the route to snap to the well-lit, heavily surveilled intersection of Dundas St & Richmond St.
+  const safeLng = -81.2497;
+  const safeLat = 42.9836;
 
-  const route = {
-    type: "Feature",
-    geometry: {
-      type: "LineString",
-      coordinates: [
-        [startLng, startLat], 
-        safeIntersection, 
-        [endLng, endLat]
-      ]
+  try {
+    // Fetch from OSRM public API (walking route)
+    // Format: {start};{waypoint};{end}
+    const osrmUrl = `http://router.project-osrm.org/route/v1/foot/${startLng},${startLat};${safeLng},${safeLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+    
+    const response = await fetch(osrmUrl);
+    if (!response.ok) throw new Error('OSRM request failed');
+    
+    const data = await response.json();
+    
+    if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+      throw new Error('No route found');
     }
-  };
 
-  return NextResponse.json({ route });
+    // OSRM returns geometry directly as GeoJSON LineString when geometries=geojson is used
+    const routeFeature = {
+      type: "Feature",
+      geometry: data.routes[0].geometry
+    };
+
+    return NextResponse.json({ route: routeFeature });
+  } catch (error) {
+    console.error("OSRM Routing Error:", error);
+    
+    // Fallback to straight lines if OSRM fails
+    const routeFeature = {
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [startLng, startLat], 
+          [safeLng, safeLat], 
+          [endLng, endLat]
+        ]
+      }
+    };
+    return NextResponse.json({ route: routeFeature });
+  }
 }
