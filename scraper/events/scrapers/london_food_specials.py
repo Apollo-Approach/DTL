@@ -109,6 +109,17 @@ VENUE_NAME_MAP = {
     "burger burger": "v-burgerburger",
     "bear & frankies": "v-bearfrankies",
     "bear & frankie's": "v-bearfrankies",
+    "mccabe's irish pub & grill": "v-mccabes",
+    "mccabe's irish pub": "v-mccabes",
+    "mccabe's": "v-mccabes",
+    "alibi roadhouse": "v-alibi",
+    "alibi": "v-alibi",
+    "frank & furter's restaurant & bar": "v-frank-furters",
+    "frank & furter's": "v-frank-furters",
+    "frank and furter's": "v-frank-furters",
+    "jack astor's bar & grill": "v-jack-astors",
+    "jack astor's": "v-jack-astors",
+    "jack astors": "v-jack-astors",
 }
 
 
