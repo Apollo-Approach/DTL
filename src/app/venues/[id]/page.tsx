@@ -51,7 +51,7 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
 
   // Fetch Upcoming Events for this venue
   const now = new Date().toISOString();
-  const { data: events, error: eventsError } = await supabase
+  const { data: events } = await supabase
     .from('events')
     .select('*')
     .eq('venue_id', id)
@@ -59,6 +59,29 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
     .order('start_time', { ascending: true });
 
   const hasEvents = events && events.length > 0;
+
+  // Fetch Promotions / Specials for this venue
+  const { data: promotions } = await supabase
+    .from('promotions')
+    .select('*')
+    .eq('venue_id', id)
+    .order('recurring_day', { ascending: true });
+
+  const hasPromotions = promotions && promotions.length > 0;
+
+  // Get today's day name for highlighting current specials
+  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+  // Group promotions by day
+  const promosByDay: Record<string, typeof promotions> = {};
+  if (promotions) {
+    for (const promo of promotions) {
+      const day = promo.recurring_day || 'other';
+      if (!promosByDay[day]) promosByDay[day] = [];
+      promosByDay[day].push(promo);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans pb-24">
@@ -180,6 +203,85 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
                   </div>
                 )}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* Weekly Specials & Deals */}
+        {hasPromotions && (
+          <section className="mb-16">
+            <div className="flex items-end justify-between mb-8 pb-4 border-b border-white/10">
+              <h2 className="text-3xl font-black uppercase tracking-tight">Specials & Deals</h2>
+              <div className="text-xs font-bold text-green-400 uppercase tracking-widest bg-green-400/10 border border-green-400/20 px-3 py-1 rounded-sm">
+                Weekly
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {dayOrder.map((day) => {
+                const dayPromos = promosByDay[day];
+                if (!dayPromos || dayPromos.length === 0) return null;
+                const isToday = day === todayDay;
+
+                return dayPromos.map((promo, i) => (
+                  <div
+                    key={`${day}-${i}`}
+                    className={`flex items-stretch border transition-colors ${
+                      isToday
+                        ? 'border-green-500/40 bg-green-500/5 shadow-[0_0_15px_rgba(34,197,94,0.08)]'
+                        : 'border-white/10 bg-black hover:border-zinc-600'
+                    }`}
+                  >
+                    {/* Day badge */}
+                    <div className={`flex items-center justify-center w-28 shrink-0 p-4 border-r ${
+                      isToday ? 'border-green-500/20 bg-green-500/10' : 'border-white/10 bg-zinc-900'
+                    }`}>
+                      <div className="text-center">
+                        <div className={`text-xs font-black uppercase tracking-widest ${
+                          isToday ? 'text-green-400' : 'text-zinc-500'
+                        }`}>
+                          {day.slice(0, 3)}
+                        </div>
+                        {isToday && (
+                          <div className="text-[9px] font-bold text-green-500 uppercase tracking-widest mt-1">
+                            Today
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Deal content */}
+                    <div className="flex-1 p-4 md:p-5">
+                      <p className={`font-bold leading-snug ${
+                        isToday ? 'text-white' : 'text-zinc-300'
+                      }`}>
+                        {promo.description}
+                      </p>
+                      {(promo.active_from_time || promo.active_until_time) && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            ⏰ {promo.active_from_time?.slice(0, 5) || 'Open'}
+                            {' — '}
+                            {promo.active_until_time?.slice(0, 5) || 'Close'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ));
+              })}
+            </div>
+
+            {/* Source Attribution */}
+            <div className="mt-4 text-right">
+              <a
+                href="https://londonfoodspecials.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 hover:text-zinc-400 transition-colors"
+              >
+                Source: London Food Specials ↗
+              </a>
             </div>
           </section>
         )}
