@@ -62,3 +62,6 @@ __pycache__/
 *.pyc
 scraper/output.json
 scraper/data/
+
+# Firebase service account keys (NEVER commit)
+*-firebase-adminsdk*.json

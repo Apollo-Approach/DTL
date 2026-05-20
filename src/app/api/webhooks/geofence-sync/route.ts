@@ -28,6 +28,48 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Generate a short-lived OAuth2 access token from a Google service account key.
+ * Used for FCM v1 API authentication.
+ */
+async function getAccessToken(serviceAccount: {
+  client_email: string;
+  private_key: string;
+  token_uri: string;
+}): Promise<string> {
+  const { SignJWT, importPKCS8 } = await import('jose');
+
+  const now = Math.floor(Date.now() / 1000);
+  const privateKey = await importPKCS8(serviceAccount.private_key, 'RS256');
+
+  const jwt = await new SignJWT({
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: serviceAccount.token_uri || 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+  })
+    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+    .sign(privateKey);
+
+  const tokenRes = await fetch(serviceAccount.token_uri || 'https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    throw new Error(`OAuth2 token exchange failed: ${await tokenRes.text()}`);
+  }
+
+  const { access_token } = await tokenRes.json();
+  return access_token;
+}
+
 export async function POST(request: Request) {
   // ── Auth: Require CRON_SECRET or valid admin session ──
   const authHeader = request.headers.get('authorization');
@@ -104,7 +146,12 @@ export async function POST(request: Request) {
     let sentCount = 0;
     let failedCount = 0;
 
-    if (deviceTokens.length > 0 && process.env.FCM_SERVER_KEY) {
+    if (deviceTokens.length > 0 && process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      // ── FCM v1 API (modern, replaces deprecated legacy API) ──
+      // Requires: GOOGLE_SERVICE_ACCOUNT_KEY env var (stringified JSON of service account key)
+      const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+      const accessToken = await getAccessToken(serviceAccount);
+
       // Compact payload — FCM data-only message (no notification key)
       const syncPayload = {
         type: 'geofence_sync',
@@ -112,48 +159,51 @@ export async function POST(request: Request) {
         timestamp: now.toISOString(),
         venue_count: venueRecords.length.toString(),
         deal_count: Object.keys(dealMap).length.toString(),
-        // Full data sent as stringified JSON in the 'data' key
-        // Clients decompress and write to local SQLite
-        sync_url: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/webhooks/geofence-sync/payload`,
+        sync_url: `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/webhooks/geofence-sync`,
       };
 
-      // FCM HTTP v1 API via topic (more efficient than individual sends)
-      // For now, send to individual tokens in batches of 500
-      const batchSize = 500;
-      for (let i = 0; i < deviceTokens.length; i += batchSize) {
-        const batch = deviceTokens.slice(i, i + batchSize);
-        const registrationIds = batch.map(t => t.fcm_token);
+      const projectId = serviceAccount.project_id;
 
+      // Send to each device token individually (FCM v1 doesn't support batch registration_ids)
+      for (const token of deviceTokens) {
         try {
-          const fcmResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `key=${process.env.FCM_SERVER_KEY}`,
-            },
-            body: JSON.stringify({
-              registration_ids: registrationIds,
-              // iOS: content-available triggers background fetch
-              content_available: true,
-              // Android: data-only message wakes app
-              data: syncPayload,
-              // Low priority to avoid battery drain
-              priority: 'normal',
-              // TTL: 6 hours (deals change frequently)
-              time_to_live: 21600,
-            }),
-          });
+          const fcmResponse = await fetch(
+            `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                message: {
+                  token: token.fcm_token,
+                  data: syncPayload,
+                  // iOS: content-available triggers background fetch
+                  apns: {
+                    payload: {
+                      aps: { 'content-available': 1 },
+                    },
+                  },
+                  // Android: normal priority for battery efficiency
+                  android: {
+                    priority: 'normal',
+                    ttl: '21600s', // 6 hours
+                  },
+                },
+              }),
+            }
+          );
 
           if (fcmResponse.ok) {
-            const result = await fcmResponse.json();
-            sentCount += result.success || 0;
-            failedCount += result.failure || 0;
+            sentCount++;
           } else {
-            failedCount += registrationIds.length;
-            console.error('[GeofenceSync] FCM batch failed:', await fcmResponse.text());
+            failedCount++;
+            const errText = await fcmResponse.text();
+            console.error(`[GeofenceSync] FCM send failed for token ${token.fcm_token.slice(0, 8)}...:`, errText);
           }
         } catch (fcmErr) {
-          failedCount += registrationIds.length;
+          failedCount++;
           console.error('[GeofenceSync] FCM send error:', fcmErr);
         }
       }
