@@ -9,3 +9,14 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+
+  dtl-events:
+    build:
+      context: .
+      dockerfile: Dockerfile.events
+    container_name: dtl-events
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - EVENT_CYCLE_HOURS=6

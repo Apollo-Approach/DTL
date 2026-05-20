@@ -9,6 +9,7 @@ export const metadata = {
 
 interface UserPass {
   id: string;
+  pass_code: string;
   status: string;
   issued_at: string;
   promotions: {
@@ -35,6 +36,7 @@ export default async function WalletPage() {
     .from('user_passes')
     .select(`
       id,
+      pass_code,
       status,
       issued_at,
       promotions (
@@ -83,8 +85,14 @@ export default async function WalletPage() {
                 
                 <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-8">
                   {/* QR Code Container */}
-                  <div className="bg-white p-4 rounded-xl shrink-0">
-                    <QRCodeSVG value={pass.id} size={150} level="H" />
+                  <div className="flex flex-col items-center gap-3 shrink-0">
+                    <div className="bg-white p-4 rounded-xl">
+                      <QRCodeSVG value={pass.pass_code} size={150} level="H" />
+                    </div>
+                    <div className="bg-zinc-900 border border-white/10 px-4 py-2 rounded-lg text-center w-full">
+                      <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Pass Code</p>
+                      <p className="font-mono text-sm text-cyan-400 font-bold">{pass.pass_code}</p>
+                    </div>
                   </div>
                   
                   {/* Details */}

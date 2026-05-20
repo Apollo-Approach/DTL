@@ -97,7 +97,7 @@ No sign-ups. No tracking. Just the city at your fingertips.
 ## 🧠 Architectural Quirks & Notes
 - **LTC Feed Caching**: The external LTC proxy servers aggressively cache their JSON payload. The backend `/api/civic/transit` route appends a cache-busting timestamp (`?t=${Date.now()}`) to the upstream fetch to ensure fresh coordinates.
 - **MapLibre 3D Math**: When generating dynamic 3D polygons (like our bus bodies), the exterior coordinate ring must be mapped in a strictly **CLOCKWISE** winding order. Counter-clockwise rings are interpreted as holes and will not extrude!
-- **Automated Data Ingestion**: We utilize a stealthy background Python crawler (`camoufox`) paired with a local Llamabox (Qwen 3.5) to parse unstructured venue websites into strict JSON `offerings`. This powers the client-side `matchScore` algorithm without requiring manual data entry.
+- **Hybrid Data Ingestion Pipeline**: We utilize a highly accurate, dual-pronged approach to venue enrichment. First, the **Google Maps Grounding Lite API** provides foundational structured data (verified hours, precise GPS coordinates, and accessibility flags). Concurrently, a stealthy background crawler (`camoufox`) paired with a local Llamabox (Qwen 3.5) acts as a deep-dive extraction tool, targeting unstructured venue websites to synthesize dynamic JSON `offerings` (menu highlights, pricing intel, upcoming events, and qualitative vibe). This hybrid model powers the client-side `matchScore` algorithm with zero manual data entry.
 - **Strict Build Integrity**: The Next.js build pipeline strictly enforces TypeScript typings and ESLint rules via the modern flat `eslint.config.mjs` format. External Python and scraper directories are explicitly ignored to prevent Vercel CI/CD failures.
 
 ---

@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
+import { generatePassCode } from '@/lib/utils/idGenerator';
+
 export async function generatePass(promotionId: string) {
   const supabase = await createClient();
 
@@ -13,6 +15,8 @@ export async function generatePass(promotionId: string) {
     return { success: false, error: 'You must be logged in to claim a pass.' };
   }
 
+  const passCode = generatePassCode();
+
   // 2. Insert the pass
   const { data: pass, error } = await supabase
     .from('user_passes')
@@ -20,6 +24,7 @@ export async function generatePass(promotionId: string) {
       promotion_id: promotionId,
       user_id: user.id,
       status: 'ISSUED',
+      pass_code: passCode,
     })
     .select()
     .single();

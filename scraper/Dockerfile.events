@@ -1,0 +1,15 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    feedparser \
+    beautifulsoup4 \
+    requests \
+    supabase \
+    python-dotenv
+
+COPY events/ ./events/
+COPY .env .env
+
+CMD ["python", "-u", "events/main.py"]

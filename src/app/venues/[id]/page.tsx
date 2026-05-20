@@ -8,12 +8,13 @@ function getSupabaseClient() {
   return createBasicClient(supabaseUrl, supabaseKey);
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = getSupabaseClient();
   const { data: venue } = await supabase
     .from('venues_public')
     .select('name, description')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (!venue) return { title: 'Venue Not Found' };
@@ -25,22 +26,23 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
 }
 
 export async function generateStaticParams() {
-  return [
-    { id: 'v-lmh' },
-    { id: 'v-grand' }
-  ];
+  // Generate pages for all venues dynamically at build time
+  const supabase = getSupabaseClient();
+  const { data: venues } = await supabase.from('venues_public').select('id');
+  return (venues || []).map((v: { id: string }) => ({ id: v.id }));
 }
 
-export const dynamicParams = false;
+export const dynamicParams = true;
 
-export default async function VenueProfile({ params }: { params: { id: string } }) {
+export default async function VenueProfile({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = getSupabaseClient();
 
   // Fetch the Venue
   const { data: venue, error: venueError } = await supabase
     .from('venues_public')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   if (venueError || !venue) {
@@ -52,7 +54,7 @@ export default async function VenueProfile({ params }: { params: { id: string } 
   const { data: events, error: eventsError } = await supabase
     .from('events')
     .select('*')
-    .eq('venue_id', params.id)
+    .eq('venue_id', id)
     .gte('end_time', now) // Only upcoming or currently running events
     .order('start_time', { ascending: true });
 
@@ -82,9 +84,29 @@ export default async function VenueProfile({ params }: { params: { id: string } 
             )}
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-none mb-6 uppercase break-words">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-none mb-4 uppercase break-words">
             {venue.name}
           </h1>
+          
+          {/* Google Rating Badge */}
+          {venue.offerings?.maps_grounding_lite?.rating && (
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700 px-4 py-2">
+                <span className="text-yellow-400 text-lg">★</span>
+                <span className="text-white font-black text-lg">{venue.offerings.maps_grounding_lite.rating}</span>
+                {venue.offerings.maps_grounding_lite.user_ratings_total && (
+                  <span className="text-zinc-500 text-sm font-medium ml-1">
+                    ({venue.offerings.maps_grounding_lite.user_ratings_total.toLocaleString()} reviews)
+                  </span>
+                )}
+              </div>
+              {venue.offerings?.maps_grounding_lite?.price_level && (
+                <span className="text-green-400 font-bold text-sm bg-zinc-900 border border-zinc-700 px-3 py-2">
+                  {'$'.repeat(venue.offerings.maps_grounding_lite.price_level)}
+                </span>
+              )}
+            </div>
+          )}
           
           <p className="text-xl md:text-2xl text-zinc-400 font-medium leading-relaxed max-w-2xl mb-8">
             {venue.description}
@@ -121,6 +143,47 @@ export default async function VenueProfile({ params }: { params: { id: string } 
           </div>
         </header>
 
+        {/* Deep-Dive Intel (Hybrid Pipeline) */}
+        {(venue.offerings?.vibe_analysis || venue.offerings?.pricing_intel || (venue.offerings?.menu_highlights && venue.offerings.menu_highlights.length > 0)) && (
+          <section className="mb-16">
+            <div className="flex items-end justify-between mb-8 pb-4 border-b border-white/10">
+              <h2 className="text-3xl font-black uppercase tracking-tight">The Vibe & Intel</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {venue.offerings?.vibe_analysis && (
+                <div className="bg-zinc-900/60 border border-zinc-800 p-6">
+                  <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-widest mb-4">Vibe Analysis</h3>
+                  <p className="text-zinc-300 leading-relaxed">{venue.offerings.vibe_analysis}</p>
+                </div>
+              )}
+              
+              <div className="flex flex-col gap-8">
+                {venue.offerings?.pricing_intel && (
+                  <div className="bg-zinc-900/60 border border-zinc-800 p-6">
+                    <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-4">Pricing & Cover</h3>
+                    <p className="text-zinc-300 leading-relaxed">{venue.offerings.pricing_intel}</p>
+                  </div>
+                )}
+                
+                {venue.offerings?.menu_highlights && venue.offerings.menu_highlights.length > 0 && (
+                  <div className="bg-zinc-900/60 border border-zinc-800 p-6">
+                    <h3 className="text-sm font-bold text-orange-400 uppercase tracking-widest mb-4">Menu Highlights</h3>
+                    <ul className="list-none space-y-2">
+                      {venue.offerings.menu_highlights.map((item: string, i: number) => (
+                        <li key={i} className="text-zinc-300 flex items-start gap-2">
+                          <span className="text-orange-400">❖</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Events Schedule (The Core of RA Style) */}
         <section>
           <div className="flex items-end justify-between mb-8 pb-4 border-b border-white/10">
@@ -130,13 +193,14 @@ export default async function VenueProfile({ params }: { params: { id: string } 
             </div>
           </div>
 
-          {!hasEvents ? (
+          {!hasEvents && (!venue.offerings?.upcoming_events || venue.offerings.upcoming_events.length === 0) ? (
             <div className="py-12 text-center bg-zinc-900/20 border border-dashed border-white/10">
               <p className="text-zinc-500 font-medium tracking-wide uppercase text-sm">No upcoming events scheduled.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {events.map((evt) => {
+              {/* Structured Database Events */}
+              {events && events.map((evt) => {
                 const startDate = new Date(evt.start_time);
                 const day = startDate.toLocaleDateString('en-US', { weekday: 'short' });
                 const dateNum = startDate.getDate().toString().padStart(2, '0');
@@ -164,6 +228,18 @@ export default async function VenueProfile({ params }: { params: { id: string } 
                         ) : (
                           <span className="text-pink-500">Tickets ${evt.price}</span>
                         )}
+                        {evt.age_restriction && (
+                          <>
+                            <span>•</span>
+                            <span className="text-amber-400">{evt.age_restriction}</span>
+                          </>
+                        )}
+                        {evt.venue_subroom && evt.venue_subroom !== 'London Music Hall' && (
+                          <>
+                            <span>•</span>
+                            <span className="text-purple-400">@ {evt.venue_subroom}</span>
+                          </>
+                        )}
                         {evt.categories && evt.categories.length > 0 && (
                           <>
                             <span>•</span>
@@ -175,6 +251,24 @@ export default async function VenueProfile({ params }: { params: { id: string } 
                   </div>
                 );
               })}
+
+              {/* Synthesized LLM Events */}
+              {venue.offerings?.upcoming_events && venue.offerings.upcoming_events.map((evt: string, i: number) => (
+                  <div key={`llm-${i}`} className="group relative flex flex-col md:flex-row md:items-center bg-black border border-dashed border-white/10 hover:border-cyan-500 transition-colors">
+                    <div className="flex items-center md:flex-col md:justify-center bg-zinc-900/50 md:w-32 p-4 md:border-r border-dashed border-white/10">
+                      <div className="text-xs font-bold text-cyan-500 uppercase tracking-widest text-center">Web Alert</div>
+                    </div>
+                    
+                    <div className="flex-1 p-5 md:p-6">
+                      <h3 className="text-lg font-bold text-white uppercase tracking-tight group-hover:text-cyan-400 transition-colors">
+                        {evt}
+                      </h3>
+                      <p className="text-xs font-bold tracking-wider uppercase text-zinc-500 mt-2">
+                        Source: Automatically Extracted from Website
+                      </p>
+                    </div>
+                  </div>
+              ))}
             </div>
           )}
         </section>

@@ -58,3 +58,7 @@ google_transit.zip
 
 # === SUPABASE LOCAL STATE ===
 supabase/.temp/
+__pycache__/
+*.pyc
+scraper/output.json
+scraper/data/
