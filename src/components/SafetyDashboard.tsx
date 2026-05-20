@@ -21,12 +21,12 @@ function AdvisoryFeed() {
   if (advisories.length === 0) return null;
 
   return (
-    <div className="w-full bg-neutral-800/50 border border-neutral-700 rounded-xl overflow-hidden relative">
+    <div className="w-full bg-amber-950/20 border border-amber-900/30 rounded-xl overflow-hidden relative">
       <div className="flex items-center">
-        <div className="flex-shrink-0 font-bold text-[10px] uppercase tracking-widest px-4 py-2 flex items-center gap-2 border-r border-neutral-700 bg-neutral-800/80 text-neutral-400 z-20">
+        <div className="flex-shrink-0 font-bold text-[10px] uppercase tracking-widest px-4 py-2 flex items-center gap-2 border-r border-amber-900/30 bg-amber-950/30 text-amber-400/80 z-20">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
           </span>
           Advisories
         </div>
@@ -192,16 +192,16 @@ export default function SafetyDashboard() {
 
       {/* The Dashboard Panel */}
       <section className="w-full">
-        <div className="bg-neutral-900/80 border border-neutral-700 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-gradient-to-b from-neutral-900/90 to-neutral-900/70 border border-amber-900/25 rounded-2xl overflow-hidden shadow-2xl">
           
           {/* Header */}
-          <div className="px-6 py-4 border-b border-neutral-800 flex items-center gap-3">
-            <div className="w-8 h-8 bg-neutral-800 rounded-lg flex items-center justify-center">
-              <Shield className="w-4 h-4 text-neutral-400" />
+          <div className="px-6 py-4 border-b border-amber-900/20 flex items-center gap-3">
+            <div className="w-8 h-8 bg-amber-900/20 rounded-lg flex items-center justify-center border border-amber-800/30">
+              <Shield className="w-4 h-4 text-amber-400/80" />
             </div>
             <div>
-              <h3 className="text-white font-bold text-sm">Safety & Moderation</h3>
-              <p className="text-neutral-500 text-xs">Your tools for a safer night out</p>
+              <h3 className="text-amber-50 font-bold text-sm">Safety & Moderation</h3>
+              <p className="text-amber-200/40 text-xs">Your tools for a safer night out</p>
             </div>
           </div>
 
