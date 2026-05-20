@@ -12,6 +12,7 @@ interface LayerToggles {
   parking: boolean;
   events: boolean;
   specials: boolean;
+  construction: boolean;
 }
 
 interface MapFilterBarProps {
@@ -154,6 +155,17 @@ export default function MapFilterBar({
               🚌
             </div>
             <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
+          </button>
+
+          {/* Construction Bubble */}
+          <button 
+            onClick={() => setLayerToggles(prev => ({ ...prev, construction: !prev.construction }))} 
+            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${layerToggles.construction ? 'bg-orange-900/50 border-[3px] border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+              🚧
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.construction ? 'text-orange-400' : 'text-neutral-500'}`}>Road Work</span>
           </button>
 
           {/* Mod Pins Bubble (Visible to all M-Tiers) */}

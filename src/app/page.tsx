@@ -6,6 +6,7 @@ import CommunityFeed from '@/components/CommunityFeed';
 import SecureQR from '@/components/SecureQR';
 import SafetyDashboard from '@/components/SafetyDashboard';
 import NearbyOfferings from '@/components/NearbyOfferings';
+import CivicEventsPanel from '@/components/CivicEventsPanel';
 
 // Force Next.js to dynamically render this page so it never caches stale safety data
 export const dynamic = 'force-dynamic';
@@ -100,6 +101,9 @@ export default async function Home() {
 
         {/* SAFETY MODERATION DASHBOARD */}
         <SafetyDashboard />
+
+        {/* CIVIC EVENTS (Ticketmaster + Local Venues) */}
+        <CivicEventsPanel />
 
         {/* CHUNK 4: JOIN CTA */}
         <section className="w-full mt-4 bg-gradient-to-r from-purple-900/30 to-cyan-900/30 border border-purple-500/30 rounded-2xl p-8 text-center shadow-2xl">

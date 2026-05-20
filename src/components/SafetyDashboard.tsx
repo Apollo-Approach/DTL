@@ -9,13 +9,24 @@ import { Shield, AlertTriangle, MapPin, Phone } from 'lucide-react';
 
 // ─── Advisory Ticker (relocated from SafetyTicker.tsx) ───
 function AdvisoryFeed() {
-  const [advisories, setAdvisories] = useState<{title: string}[]>([]);
+  const [advisories, setAdvisories] = useState<{title: string; type?: string}[]>([]);
 
   useEffect(() => {
-    fetch('/api/safety/advisories')
-      .then(res => res.json())
-      .then(data => setAdvisories(data.advisories || []))
-      .catch(err => console.error(err));
+    // Fetch both safety advisories and construction closures in parallel
+    Promise.all([
+      fetch('/api/safety/advisories').then(res => res.json()).catch(() => ({ advisories: [] })),
+      fetch('/api/civic/construction').then(res => res.json()).catch(() => ({ projects: [] }))
+    ]).then(([safetyData, constructionData]) => {
+      const safetyAdvisories = (safetyData.advisories || []).map((a: {title: string}) => ({ ...a, type: 'safety' }));
+      
+      // Convert construction projects into advisory-format messages
+      const constructionAdvisories = (constructionData.projects || []).map((p: {title: string; location: string; impacts: string[]}) => ({
+        title: `🚧 ${p.title} — ${p.location}${p.impacts?.[0] ? ` (${p.impacts[0]})` : ''}`,
+        type: 'construction'
+      }));
+
+      setAdvisories([...safetyAdvisories, ...constructionAdvisories]);
+    });
   }, []);
 
   if (advisories.length === 0) return null;
@@ -28,12 +39,12 @@ function AdvisoryFeed() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
           </span>
-          Advisories
+          Live
         </div>
         <div className="flex-1 overflow-hidden relative flex items-center py-2">
-          <div className="whitespace-nowrap animate-[marquee_25s_linear_infinite] text-xs font-medium text-neutral-300">
+          <div className="whitespace-nowrap animate-[marquee_30s_linear_infinite] text-xs font-medium text-neutral-300">
             {advisories.map((adv, idx) => (
-              <span key={idx} className="mx-8">
+              <span key={idx} className={`mx-8 ${adv.type === 'construction' ? 'text-orange-300' : ''}`}>
                 {adv.title}
               </span>
             ))}
