@@ -37,6 +37,7 @@ HEADERS = {
 VENUE_NAME_MAP = {
     "fitzrays": "v-fitzrays",
     "fitzray's": "v-fitzrays",
+    "fitz rays": "v-fitzrays",
     "fitzray's restaurant & lounge": "v-fitzrays",
     "winks eatery": "v-winks",
     "wink's eatery": "v-winks",
@@ -81,6 +82,7 @@ VENUE_NAME_MAP = {
     "delilah's": "v-delilahs",
     "the well": "v-thewell",
     "wolfepack company bar": "v-thewell",  # Same ownership group downtown
+    "wolfe pack company bar": "v-thewell",
     "waldo's on king": "v-waldo",
     "waldo's": "v-waldo",
     "ironwood kitchen & bar": "v-church-key",  # same area

@@ -64,86 +64,100 @@ def _generate_event_id(guid: str) -> str:
 def scrape_lmh_events() -> list[dict]:
     """
     Scrape London Music Hall events from their RSS feed.
+    Paginates through all feed pages (?paged=N) to get all events.
     Returns a list of event dicts ready for Supabase insertion.
     """
-    logger.info(f"Fetching LMH RSS feed: {LMH_RSS_URL}")
-    feed = feedparser.parse(LMH_RSS_URL)
-    
-    if feed.bozo:
-        logger.warning(f"RSS feed parse warning: {feed.bozo_exception}")
-    
     events = []
+    max_pages = 10  # Safety limit
     
-    for entry in feed.entries:
-        try:
-            title = entry.get("title", "").strip()
-            link = entry.get("link", "")
-            guid = entry.get("id", link)
-            pub_date = entry.get("published", "")
-            
-            # Get the rich content (content:encoded)
-            content_html = ""
-            if hasattr(entry, "content") and entry.content:
-                content_html = entry.content[0].get("value", "")
-            elif hasattr(entry, "summary"):
-                content_html = entry.summary or ""
-            
-            # Extract metadata from content
-            subroom = _detect_subroom(content_html)
-            age_restriction = _detect_age_restriction(content_html)
-            door_time_str = _extract_door_time(content_html)
-            description = _clean_html(content_html)
-            
-            # Parse publication date as event date
-            # Note: RSS pubDate is when the post was published, not the event date
-            # LMH doesn't include actual event dates in RSS metadata
-            # We use pubDate as a proxy and the scraper should be run frequently
-            if pub_date:
-                try:
-                    parsed_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                except (TypeError, AttributeError):
+    for page in range(1, max_pages + 1):
+        url = f"{LMH_RSS_URL}?paged={page}" if page > 1 else LMH_RSS_URL
+        logger.info(f"Fetching LMH RSS feed page {page}: {url}")
+        
+        feed = feedparser.parse(url)
+        
+        if feed.bozo and not feed.entries:
+            logger.info(f"Page {page}: feed error with no entries, stopping pagination")
+            break
+        
+        if not feed.entries:
+            logger.info(f"Page {page}: no entries, stopping pagination")
+            break
+        
+        page_count = 0
+        for entry in feed.entries:
+            try:
+                title = entry.get("title", "").strip()
+                link = entry.get("link", "")
+                guid = entry.get("id", link)
+                pub_date = entry.get("published", "")
+                
+                # Get the rich content (content:encoded)
+                content_html = ""
+                if hasattr(entry, "content") and entry.content:
+                    content_html = entry.content[0].get("value", "")
+                elif hasattr(entry, "summary"):
+                    content_html = entry.summary or ""
+                
+                # Extract metadata from content
+                subroom = _detect_subroom(content_html)
+                age_restriction = _detect_age_restriction(content_html)
+                door_time_str = _extract_door_time(content_html)
+                description = _clean_html(content_html)
+                
+                # Parse publication date as event date
+                # Note: RSS pubDate is when the post was published, not the event date
+                # LMH doesn't include actual event dates in RSS metadata
+                # We use pubDate as a proxy and the scraper should be run frequently
+                if pub_date:
+                    try:
+                        parsed_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+                    except (TypeError, AttributeError):
+                        parsed_date = datetime.now(timezone.utc)
+                else:
                     parsed_date = datetime.now(timezone.utc)
-            else:
-                parsed_date = datetime.now(timezone.utc)
-            
-            # Use pubDate as start_time (best we have from RSS)
-            # Events without explicit dates are still valuable as "upcoming"
-            start_time = parsed_date.isoformat()
-            # Default 4-hour event duration
-            end_time = parsed_date.replace(
-                hour=min(parsed_date.hour + 4, 23)
-            ).isoformat()
-            
-            event_id = _generate_event_id(guid)
-            venue_name = "London Music Hall" if subroom == "London Music Hall" else "London Music Hall"
-            dedup_hash = _generate_dedup_hash(title, start_time[:10], venue_name)
-            
-            event = {
-                "id": event_id,
-                "name": title,
-                "venue_id": "v-london-music-hall",  # Known venue ID in our DB
-                "start_time": start_time,
-                "end_time": end_time,
-                "is_free": False,
-                "price": 0.0,
-                "categories": ["LIVE_MUSIC"],
-                "description": description[:500] if description else f"Live at {subroom}",
-                "ticket_url": link,
-                "source_platform": "london_music_hall",
-                "source_url": link,
-                "age_restriction": age_restriction,
-                "venue_subroom": subroom,
-                "dedup_hash": dedup_hash,
-            }
-            
-            events.append(event)
-            logger.info(f"  Parsed: {title} @ {subroom} | {age_restriction or 'No age info'}")
-            
-        except Exception as e:
-            logger.error(f"  Failed to parse entry: {e}")
-            continue
+                
+                # Use pubDate as start_time (best we have from RSS)
+                # Events without explicit dates are still valuable as "upcoming"
+                start_time = parsed_date.isoformat()
+                # Default 4-hour event duration
+                end_time = parsed_date.replace(
+                    hour=min(parsed_date.hour + 4, 23)
+                ).isoformat()
+                
+                event_id = _generate_event_id(guid)
+                venue_name = "London Music Hall"
+                dedup_hash = _generate_dedup_hash(title, start_time[:10], venue_name)
+                
+                event = {
+                    "id": event_id,
+                    "name": title,
+                    "venue_id": "v-london-music-hall",  # Known venue ID in our DB
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "is_free": False,
+                    "price": 0.0,
+                    "categories": ["LIVE_MUSIC"],
+                    "description": description[:500] if description else f"Live at {subroom}",
+                    "ticket_url": link,
+                    "source_platform": "london_music_hall",
+                    "source_url": link,
+                    "age_restriction": age_restriction,
+                    "venue_subroom": subroom,
+                    "dedup_hash": dedup_hash,
+                }
+                
+                events.append(event)
+                page_count += 1
+                logger.info(f"  Parsed: {title} @ {subroom} | {age_restriction or 'No age info'}")
+                
+            except Exception as e:
+                logger.error(f"  Failed to parse entry: {e}")
+                continue
+        
+        logger.info(f"Page {page}: scraped {page_count} events")
     
-    logger.info(f"Scraped {len(events)} events from LMH RSS feed")
+    logger.info(f"Scraped {len(events)} total events from LMH RSS feed ({page} pages)")
     return events
 
 
