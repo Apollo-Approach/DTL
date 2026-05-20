@@ -808,12 +808,6 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
               ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
               ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
               ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
-              <button 
-                onclick="window.requestSafeWalk(${venue.lng}, ${venue.lat})" 
-                style="margin-top: 12px; width: 100%; padding: 8px; background: linear-gradient(to right, ${markerColor}, #06b6d4); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"
-              >
-                🛡️ Request SafeWalk
-              </button>
             </div>`
           )
         )

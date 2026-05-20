@@ -70,7 +70,45 @@ export default function MapFilterBar({
           {/* Marketing Bubbles (Hidden for M-Tier Mods to reduce cognitive load) */}
           {!userRole.startsWith('m') && (
             <>
-              {/* NIGHTLY Bubble */}
+            </>
+          )}
+
+          {mode === 'public' && (
+            <>
+              {/* Bars Bubble */}
+              <button 
+                onClick={() => toggleCategory('Nightlife')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🪩
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Bars</span>
+              </button>
+
+              {/* Eats Bubble */}
+              <button 
+                onClick={() => toggleCategory('Eatery')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🍔
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
+              </button>
+
+              {/* Stages Bubble */}
+              <button 
+                onClick={() => toggleCategory('Stage')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🎭
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
+              </button>
+
+              {/* Events Sub-Filter Bubble — filters selected venue type to only those with events */}
               <button 
                 onClick={() => setLayerToggles(prev => ({ ...prev, events: !prev.events }))} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
@@ -79,54 +117,6 @@ export default function MapFilterBar({
                   🎫
                 </div>
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.events ? 'text-pink-400' : 'text-neutral-500'}`}>Events</span>
-              </button>
-
-              {/* SPECIALS Bubble */}
-              <button 
-                onClick={() => setLayerToggles(prev => ({ ...prev, specials: !prev.specials }))} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${layerToggles.specials ? 'bg-orange-900/50 border-[3px] border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🏷️
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.specials ? 'text-orange-400' : 'text-neutral-500'}`}>Specials</span>
-              </button>
-            </>
-          )}
-
-          {mode === 'public' && (
-            <>
-              {/* Clubs/Bars Bubble */}
-              <button 
-                onClick={() => toggleCategory('Nightlife')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🪩
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Clubs/Bars</span>
-              </button>
-
-              {/* Eateries Bubble */}
-              <button 
-                onClick={() => toggleCategory('Eatery')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🍔
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eateries</span>
-              </button>
-
-              {/* Arts Bubble */}
-              <button 
-                onClick={() => toggleCategory('Stage')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🎭
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages/Galleries</span>
               </button>
 
               {/* For You Bubble */}
@@ -141,17 +131,6 @@ export default function MapFilterBar({
                   <span className={`text-[10px] font-bold uppercase tracking-wider ${forYou ? 'text-cyan-400' : 'text-neutral-500'}`}>For You</span>
                 </button>
               )}
-
-              {/* Late Night Bubble */}
-              <button 
-                onClick={() => toggleCategory('LateNight')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'LateNight' ? 'bg-indigo-900/50 border-[3px] border-indigo-400 shadow-[0_0_15px_rgba(129,140,248,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🌙
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'LateNight' ? 'text-indigo-400' : 'text-neutral-500'}`}>Late Night</span>
-              </button>
             </>
           )}
 

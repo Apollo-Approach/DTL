@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DTL Nightly — London's Civic Dashboard",
-  description: "Real-time transit, nightlife, and community safety for downtown London, Ontario.",
+  title: "DTL Nightly — London's Nightlife Promotion Platform",
+  description: "Discover the best nightlife, events, and specials in downtown London, Ontario. Bars, eats, and live stages — all in one place.",
 };
 
 import type { Viewport } from 'next';

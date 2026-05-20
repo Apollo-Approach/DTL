@@ -123,21 +123,6 @@ export default function VenueDetailModal({ venue, promos, onClose }: VenueDetail
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="pt-2">
-            <button 
-              onClick={() => {
-                if (typeof window !== 'undefined' && (window as any).requestSafeWalk) {
-                  (window as any).requestSafeWalk(venue.lng, venue.lat);
-                  onClose();
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-purple-500/25 active:scale-[0.98]"
-            >
-              <Shield className="w-5 h-5" />
-              Request SafeWalk Here
-            </button>
-          </div>
         </div>
       </div>
     </div>

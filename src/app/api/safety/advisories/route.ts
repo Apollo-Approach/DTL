@@ -25,8 +25,8 @@ export async function GET() {
     // Graceful fallback if the municipal WAF blocks our local dev environment
     return NextResponse.json({ advisories: [
         { title: 'Traffic Advisory: Dundas Place closed to vehicles for weekend pedestrian activation.', date: new Date().toISOString() },
-        { title: 'Community Safety: Increased mediator & outreach presence scheduled for Richmond Row tonight.', date: new Date(Date.now() - 86400000).toISOString() },
-        { title: 'LPS Advisory: Please use designated SafeWalk corridors after 2 AM.', date: new Date().toISOString() }
+        { title: 'Weather: Check Environment Canada for current conditions before heading downtown.', date: new Date(Date.now() - 86400000).toISOString() },
+        { title: 'Transit: London Transit schedules may vary on statutory holidays. Visit londontransit.ca for details.', date: new Date().toISOString() }
     ]});
   }
 }

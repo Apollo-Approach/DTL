@@ -81,18 +81,6 @@ export default async function Home() {
               Are you Down to Love Downtown London?
             </p>
           </div>
-          
-          {incidents.length > 0 && (
-            <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-500 px-4 py-3 rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-              </span>
-              <span className="text-sm font-bold uppercase tracking-wide">
-                {incidents.length} Active Mediator{incidents.length > 1 ? 's' : ''} Dispatched
-              </span>
-            </div>
-          )}
         </div>
       </header>
 
