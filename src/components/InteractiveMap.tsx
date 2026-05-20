@@ -66,6 +66,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   // Construction advisory data
   const [constructionProjects, setConstructionProjects] = useState<{id: string; title: string; description: string; impacts: string[]; location: string; source: string}[]>([]);
 
+  // Transit route alerts (route_id → alert summaries)
+  const routeAlertsRef = useRef<Record<string, string[]>>({});
+
   const [isPinMode, setIsPinMode] = useState(false);
   const pinModeRef = useRef(false);
 
@@ -462,6 +465,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         const fetchLiveTransit = async () => {
           try {
             const [transitRes, parkingRes] = await Promise.all([ fetch('/api/civic/transit'), fetch('/api/civic/parking') ]);
+
+            // Fetch transit alerts less frequently (merged into polling but lightweight)
+            fetch('/api/civic/transit/alerts').then(r => r.json()).then(d => {
+              if (d.routeAlerts) routeAlertsRef.current = d.routeAlerts;
+            }).catch(() => {});
             
             if (transitRes.ok) {
               const data = await transitRes.json();
@@ -525,7 +533,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
                 id: bus.id, routeId: bus.routeId, routeLabel: routeLabel, headsign: fullHeadsign, centerLng: bus.currentLng, centerLat: bus.currentLat, 
                 speed: bus.speed, isDelayed: bus.isDelayed, delaySeconds: bus.delaySeconds, delayLabel: bus.delayLabel, currentStatus: bus.currentStatus, 
                 stopId: bus.stopId, directionId: bus.directionId, occupancyStatus: bus.occupancyStatus, 
-                occupancyPercentage: bus.occupancyPercentage, hasOccupancyData: bus.hasOccupancyData, timestamp: bus.timestamp 
+                occupancyPercentage: bus.occupancyPercentage, hasOccupancyData: bus.hasOccupancyData, timestamp: bus.timestamp,
+                alertCount: (routeAlertsRef.current[bus.routeId] || []).length,
+                alertSummary: (routeAlertsRef.current[bus.routeId] || []).slice(0, 2).join(' | ') || null
               }
             });
             labelFeatures.push({
@@ -643,6 +653,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
                   <div style="background:${occColor}; height:100%; width:${pctBarWidth}%; border-radius:4px; transition:width 0.3s;"></div>
                 </div>` : ''}
                 <div>⏱️ <strong>Speed:</strong> ${(props.speed * 3.6).toFixed(1)} km/h</div>
+                ${props.alertCount > 0 ? `<div style="margin-top:5px; padding:4px 6px; background:#78350f22; border:1px solid #92400e44; border-radius:6px; font-size:11px; color:#fbbf24;">
+                  ⚠️ <strong>${props.alertCount} alert${props.alertCount > 1 ? 's' : ''}</strong> on this route
+                  ${props.alertSummary ? `<div style="color:#d97706; font-size:10px; margin-top:2px; white-space:normal; line-height:1.3;">${props.alertSummary.slice(0, 120)}</div>` : ''}
+                </div>` : ''}
               </div>
             </div>`)
             .addTo(map);

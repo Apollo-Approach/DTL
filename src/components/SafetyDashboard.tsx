@@ -12,11 +12,12 @@ function AdvisoryFeed() {
   const [advisories, setAdvisories] = useState<{title: string; type?: string}[]>([]);
 
   useEffect(() => {
-    // Fetch both safety advisories and construction closures in parallel
+    // Fetch safety advisories, construction closures, AND transit alerts in parallel
     Promise.all([
       fetch('/api/safety/advisories').then(res => res.json()).catch(() => ({ advisories: [] })),
-      fetch('/api/civic/construction').then(res => res.json()).catch(() => ({ projects: [] }))
-    ]).then(([safetyData, constructionData]) => {
+      fetch('/api/civic/construction').then(res => res.json()).catch(() => ({ projects: [] })),
+      fetch('/api/civic/transit/alerts').then(res => res.json()).catch(() => ({ alerts: [] }))
+    ]).then(([safetyData, constructionData, transitAlertData]) => {
       const safetyAdvisories = (safetyData.advisories || []).map((a: {title: string}) => ({ ...a, type: 'safety' }));
       
       // Convert construction projects into advisory-format messages
@@ -25,7 +26,13 @@ function AdvisoryFeed() {
         type: 'construction'
       }));
 
-      setAdvisories([...safetyAdvisories, ...constructionAdvisories]);
+      // Convert transit alerts into advisory-format messages
+      const transitAdvisories = (transitAlertData.alerts || []).map((a: {header: string; description: string; routes: string[]; effect: string}) => ({
+        title: `🚌 ${a.header}${a.routes.length ? ` [Rte ${a.routes.join(', ')}]` : ''}: ${a.description.slice(0, 100)}`,
+        type: 'transit'
+      }));
+
+      setAdvisories([...safetyAdvisories, ...constructionAdvisories, ...transitAdvisories]);
     });
   }, []);
 
@@ -44,7 +51,10 @@ function AdvisoryFeed() {
         <div className="flex-1 overflow-hidden relative flex items-center py-2">
           <div className="whitespace-nowrap animate-[marquee_30s_linear_infinite] text-xs font-medium text-neutral-300">
             {advisories.map((adv, idx) => (
-              <span key={idx} className={`mx-8 ${adv.type === 'construction' ? 'text-orange-300' : ''}`}>
+              <span key={idx} className={`mx-8 ${
+                adv.type === 'construction' ? 'text-orange-300' : 
+                adv.type === 'transit' ? 'text-sky-300' : ''
+              }`}>
                 {adv.title}
               </span>
             ))}
