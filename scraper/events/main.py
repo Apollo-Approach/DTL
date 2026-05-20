@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-DTL Events Pipeline Orchestrator
-Runs all event scrapers, deduplicates, and upserts to Supabase.
+DTL Events & Promotions Pipeline Orchestrator
+Runs all event/promotions scrapers, deduplicates, and upserts to Supabase.
 """
 import os
 import sys
@@ -15,6 +15,7 @@ from supabase import create_client, Client
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scrapers.london_music_hall import scrape_lmh_events
 from scrapers.eventbrite import scrape_eventbrite_events
+from scrapers.london_food_specials import scrape_london_food_specials
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
@@ -106,6 +107,61 @@ def upsert_events(supabase: Client, events: list[dict]) -> int:
     
     return success_count
 
+def upsert_promotions(supabase: Client, promotions: list[dict]) -> int:
+    """
+    Upsert promotions into Supabase with merge-enrichment logic.
+    Only inserts promotions that have a matched venue_id.
+    Returns count of successfully upserted promotions.
+    """
+    success_count = 0
+    
+    for promo in promotions:
+        try:
+            dedup_hash = promo.get("dedup_hash")
+            if not dedup_hash:
+                continue
+            
+            # Skip unmatched venues
+            if not promo.get("venue_id"):
+                continue
+            
+            # Remove internal metadata fields (prefixed with _)
+            clean_promo = {k: v for k, v in promo.items() if not k.startswith("_")}
+            
+            # Remove None values to avoid overwriting with nulls
+            clean_promo = {k: v for k, v in clean_promo.items() if v is not None}
+            
+            # Check if promotion already exists
+            existing = supabase.table("promotions").select("*").eq("dedup_hash", dedup_hash).execute()
+            
+            if existing.data and len(existing.data) > 0:
+                # MERGE-ENRICHMENT: Only update null fields
+                existing_promo = existing.data[0]
+                updates = {}
+                
+                for key, new_value in clean_promo.items():
+                    if key in ("id", "dedup_hash"):
+                        continue
+                    existing_value = existing_promo.get(key)
+                    if existing_value is None and new_value is not None:
+                        updates[key] = new_value
+                
+                if updates:
+                    supabase.table("promotions").update(updates).eq("id", existing_promo["id"]).execute()
+                    logger.info(f"  ↗ Enriched promo: {promo.get('title', '')[:50]} (+{len(updates)} fields)")
+            else:
+                # New promotion — INSERT
+                supabase.table("promotions").insert(clean_promo).execute()
+                logger.info(f"  ✓ Inserted promo: {promo.get('title', '')[:50]}")
+            
+            success_count += 1
+            
+        except Exception as e:
+            logger.error(f"  ✗ Failed to upsert promo '{promo.get('title', '')}': {e}")
+            continue
+    
+    return success_count
+
 def run_pipeline():
     """Run the full events pipeline."""
     logger.info("=" * 60)
@@ -133,7 +189,17 @@ def run_pipeline():
     except Exception as e:
         logger.error(f"Eventbrite scraper failed: {e}")
     
-    # 3. Upsert all events to Supabase
+    # 3. London Food Specials (Promotions via WP REST API)
+    logger.info("\n--- Source: London Food Specials ---")
+    try:
+        lfs_promos = scrape_london_food_specials()
+        logger.info(f"London Food Specials: {len(lfs_promos)} promotions scraped")
+        promo_success = upsert_promotions(supabase, lfs_promos)
+        logger.info(f"Promotions upserted: {promo_success}/{len(lfs_promos)}")
+    except Exception as e:
+        logger.error(f"London Food Specials scraper failed: {e}")
+    
+    # 4. Upsert all events to Supabase
     logger.info(f"\n--- Upserting {len(all_events)} events ---")
     success = upsert_events(supabase, all_events)
     logger.info(f"Pipeline complete: {success}/{len(all_events)} events processed")
