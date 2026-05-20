@@ -57,7 +57,10 @@ export enum IncidentType {
   CRISIS_PERSON = 'CRISIS_PERSON',
   CROWD_ESCALATION = 'CROWD_ESCALATION',
   SAFEWALK_SOS = 'SAFEWALK_SOS',
-  PANIC_ALARM = 'PANIC_ALARM'
+  PANIC_ALARM = 'PANIC_ALARM',
+  POSSIBLE_OD = 'POSSIBLE_OD',
+  CROWD_NOISE = 'CROWD_NOISE',
+  CLEANUP = 'CLEANUP'
 }
 
 export enum IncidentStatus {
@@ -77,6 +80,7 @@ export const SafetyIncidentSchema = z.object({
   dispatched_to: z.string().uuid().optional(),
   dispatched_at: z.string().datetime().optional(),
   location: z.object({ lat: z.number(), lng: z.number() }).optional(),
+  image_url: z.string().url().nullable().optional(),
   lat: z.number(),
   lng: z.number()
 });
