@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/log-transit-delay",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/ingest-events",
+      "schedule": "0 */6 * * *"
     }
   ]
 }
