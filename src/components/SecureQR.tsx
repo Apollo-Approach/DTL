@@ -1,8 +1,9 @@
 // src/components/SecureQR.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { generateSignedQrPayload } from '@/app/actions/qr';
 
 interface SecureQRProps {
   promotionId: string;
@@ -12,17 +13,27 @@ interface SecureQRProps {
 }
 
 export default function SecureQR({ promotionId, venueName, discountValue, title }: SecureQRProps) {
-  const [qrPayload, setQrPayload] = React.useState<string | null>(null);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    // In production, this JSON payload would be cryptographically signed
-    const timer = setTimeout(() => {
-      setQrPayload(JSON.stringify({
-        promo: promotionId,
-        timestamp: Date.now()
-      }));
-    }, 0);
-    return () => clearTimeout(timer);
+  useEffect(() => {
+    let mounted = true;
+    
+    async function fetchPayload() {
+      try {
+        const signedPayload = await generateSignedQrPayload(promotionId);
+        if (mounted) {
+          setQrPayload(signedPayload);
+        }
+      } catch (err) {
+        console.error('Failed to generate signed QR payload:', err);
+      }
+    }
+    
+    fetchPayload();
+    
+    return () => {
+      mounted = false;
+    };
   }, [promotionId]);
 
   return (

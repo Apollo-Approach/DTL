@@ -49,7 +49,7 @@ function AdvisoryFeed() {
           Live
         </div>
         <div className="flex-1 overflow-hidden relative flex items-center py-2">
-          <div className="whitespace-nowrap animate-[marquee_30s_linear_infinite] text-xs font-medium text-neutral-300">
+          <div className="whitespace-nowrap animate-[marquee_90s_linear_infinite] text-xs font-medium text-neutral-300">
             {advisories.map((adv, idx) => (
               <span key={idx} className={`mx-8 ${
                 adv.type === 'construction' ? 'text-orange-300' : 
@@ -72,9 +72,8 @@ function AdvisoryFeed() {
 }
 
 // ─── Panic Button Dialog ───
-function PanicDialog({ onClose }: { onClose: () => void }) {
+function PanicDialog({ onClose, supabase }: { onClose: () => void, supabase: ReturnType<typeof createClient> }) {
   const [confirmed, setConfirmed] = useState(false);
-  const supabase = React.useMemo(() => createClient(), []);
 
   const handleConfirm = async () => {
     setConfirmed(true);
@@ -164,6 +163,7 @@ function PanicDialog({ onClose }: { onClose: () => void }) {
 export default function SafetyDashboard() {
   const [activePanel, setActivePanel] = useState<'none' | 'safewalk' | 'panic'>('none');
   const [safeWalkExpiresAt, setSafeWalkExpiresAt] = useState<number | null>(null);
+  const supabase = React.useMemo(() => createClient(), []);
 
   // If SafeWalk is actively running, show the overlay anywhere on the page
   const safeWalkActive = safeWalkExpiresAt !== null;
@@ -208,7 +208,7 @@ export default function SafetyDashboard() {
 
       {/* Panic Dialog */}
       {activePanel === 'panic' && (
-        <PanicDialog onClose={() => setActivePanel('none')} />
+        <PanicDialog onClose={() => setActivePanel('none')} supabase={supabase} />
       )}
 
       {/* The Dashboard Panel */}

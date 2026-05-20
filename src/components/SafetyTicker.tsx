@@ -26,7 +26,7 @@ export default function SafetyTicker() {
           Civic Advisories
         </div>
         <div className="flex-1 overflow-hidden relative flex items-center">
-          <div className="whitespace-nowrap animate-[marquee_20s_linear_infinite] text-sm font-medium">
+          <div className="whitespace-nowrap animate-[marquee_90s_linear_infinite] text-sm font-medium">
             {advisories.map((adv, idx) => (
               <span key={idx} className="mx-12 text-blue-300">
                 ⚠️ {adv.title}

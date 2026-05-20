@@ -11,33 +11,19 @@ export default function ScanPage() {
   const handleScan = async (text: string) => {
     if (!text || !isScanning) return;
     setIsScanning(false);
-    setStatus({ type: 'idle', message: 'Verifying Ticket...' });
+    setStatus({ type: 'idle', message: 'Verifying Signature...' });
 
     try {
-      const payload = JSON.parse(text);
-      if (!payload.promo) throw new Error("Invalid Format");
+      const { verifySignedQrPayload } = await import('@/app/actions/qr');
+      const result = await verifySignedQrPayload(text);
 
-      let currentDeviceId = localStorage.getItem('dtl_device_id');
-      if (!currentDeviceId) {
-        currentDeviceId = 'dev-' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('dtl_device_id', currentDeviceId);
-      }
-
-      const res = await fetch('/api/promotions/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ promoId: payload.promo, deviceId: currentDeviceId })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setStatus({ type: 'success', message: data.message });
+      if (result.success) {
+        setStatus({ type: 'success', message: 'Valid Promotion QR Code' });
       } else {
-        setStatus({ type: 'error', message: data.error || 'Redemption Failed' });
+        setStatus({ type: 'error', message: result.error || 'Invalid QR Code' });
       }
     } catch (err) {
-      setStatus({ type: 'error', message: 'Invalid QR Code payload.' });
+      setStatus({ type: 'error', message: 'Verification failed.' });
     }
 
     // Reset scanner after 3.5 seconds
