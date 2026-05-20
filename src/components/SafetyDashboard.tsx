@@ -1,7 +1,7 @@
 // src/components/SafetyDashboard.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import SafeWalkModal from '@/components/map/SafeWalkModal';
 import SafeWalkOverlay from '@/components/map/SafeWalkOverlay';
@@ -10,6 +10,8 @@ import { Shield, AlertTriangle, MapPin, Phone } from 'lucide-react';
 // ─── Advisory Ticker (relocated from SafetyTicker.tsx) ───
 function AdvisoryFeed() {
   const [advisories, setAdvisories] = useState<{title: string; type?: string}[]>([]);
+  const [duration, setDuration] = useState(90);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Fetch safety advisories, construction closures, AND transit alerts in parallel
@@ -36,6 +38,17 @@ function AdvisoryFeed() {
     });
   }, []);
 
+  useEffect(() => {
+    if (containerRef.current) {
+      const width = containerRef.current.scrollWidth;
+      // We want a readable constant speed of 60 pixels per second.
+      // Since it scrolls from translateX(100vw) to translateX(-100%), the travel distance is approx window width + scroll width.
+      const distance = window.innerWidth + width;
+      const calculatedDuration = distance / 60;
+      setDuration(Math.max(calculatedDuration, 30));
+    }
+  }, [advisories]);
+
   if (advisories.length === 0) return null;
 
   return (
@@ -49,7 +62,11 @@ function AdvisoryFeed() {
           Live
         </div>
         <div className="flex-1 overflow-hidden relative flex items-center py-2">
-          <div className="whitespace-nowrap animate-[marquee_90s_linear_infinite] text-xs font-medium text-neutral-300">
+          <div
+            ref={containerRef}
+            className="whitespace-nowrap animate-[marquee_linear_infinite] text-xs font-medium text-neutral-300"
+            style={{ animationDuration: `${duration}s` }}
+          >
             {advisories.map((adv, idx) => (
               <span key={idx} className={`mx-8 ${
                 adv.type === 'construction' ? 'text-orange-300' : 
@@ -63,7 +80,7 @@ function AdvisoryFeed() {
       </div>
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes marquee {
-          0% { transform: translateX(100%); }
+          0% { transform: translateX(100vw); }
           100% { transform: translateX(-100%); }
         }
       `}} />
