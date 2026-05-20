@@ -1,7 +1,7 @@
 // src/components/InteractiveMap.tsx
 'use client';
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { createClient } from '@/lib/supabase/client';
@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
 import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
-import { BusState, getBusPolygon, getOccupancyText, getOccupancyColor, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
+import { BusState, getBusPolygon, getOccupancyText, getOccupancyColor, getStatusText, getDirectionText, escapeHtml, VENUE_CATEGORIES, CATEGORY_COLORS, getVenueCategory, sanitizeUrl } from './map/mapHelpers';
 import { initBuildingExtrusions, matchVenuesToBuildings, startShimmerAnimation, stopShimmerAnimation, destroyBuildingExtrusions } from './map/buildingExtrusions';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
@@ -78,7 +78,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [pinCategory, setPinCategory] = useState<string>('');
   const [pinDescription, setPinDescription] = useState<string>('');
 
-  const togglePinMode = async () => {
+  const togglePinMode = useCallback(async () => {
     if (!session || session.user.is_anonymous) {
       alert("You must be logged in to report an incident.");
       return;
@@ -114,7 +114,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     } catch (err) {
       alert("Location Services must be enabled to report an incident. Please enable them and try again.");
     }
-  };
+  }, [session]);
 
   // 0. Initialize Auth State
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     const handler = () => togglePinMode();
     window.addEventListener('dtl:toggle-pin-mode', handler);
     return () => window.removeEventListener('dtl:toggle-pin-mode', handler);
-  }, []);
+  }, [togglePinMode]);
 
   const animationFrameRef = useRef<number | undefined>(undefined);
 
@@ -822,6 +822,8 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     }
 
     return () => {
+      // Clean up global SafeWalk function to prevent stale closure calls
+      delete (window as any).requestSafeWalk;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -850,18 +852,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       if (!activeFilter) return false;
 
       // Category filter — map filter bubble values to venue.type
-      switch (activeFilter) {
-        case 'Nightlife':
-          return ['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(venue.type || '');
-        case 'Eatery':
-          return ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(venue.type || '');
-        case 'Stage':
-          return ['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(venue.type || '');
-        case 'LateNight':
-          return !!venue.late_night_eligible;
-        default:
-          return false;
-      }
+      if (activeFilter === 'LateNight') return !!venue.late_night_eligible;
+      const filterTypes = VENUE_CATEGORIES[activeFilter as keyof typeof VENUE_CATEGORIES];
+      return filterTypes ? (filterTypes as readonly string[]).includes(venue.type || '') : false;
     });
 
     // Draw Venues (invisible click targets — 3D buildings are the visual)
@@ -871,15 +864,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       const isPopUp = venue.status === 'POP_UP';
 
       // Dynamic Marker Coloring based on Industry Standards
-      let markerColor = '#64748b'; // Default slate
-      const vType = venue.type || '';
-      if (['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(vType)) {
-        markerColor = '#d946ef'; // Nightlife (Fuchsia)
-      } else if (['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(vType)) {
-        markerColor = '#f97316'; // Eatery (Orange)
-      } else if (['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(vType)) {
-        markerColor = '#eab308'; // Stage (Yellow)
-      }
+      let markerColor = CATEGORY_COLORS[getVenueCategory(venue.type)];
 
       // Override with Cyan if it's a Pop-Up
       if (isPopUp) {
@@ -905,10 +890,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         .setPopup(
           new maplibregl.Popup({ offset: 25, closeButton: true, closeOnClick: true, className: 'venue-popup' }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 8px; min-width: 180px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: ${markerColor};">${venue.name}</h3>
-              <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${venue.address}</p>
-              ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${day}: ${hrs}`).join(' · ') : venue.operating_hours}</p>` : ''}
-              ${venue.website_url ? `<a href="${venue.website_url}" target="_blank" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
+              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: ${markerColor};">${escapeHtml(venue.name)}</h3>
+              <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${escapeHtml(venue.address)}</p>
+              ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' && venue.operating_hours !== null ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${escapeHtml(day)}: ${escapeHtml(String(hrs))}`).join(' · ') : escapeHtml(String(venue.operating_hours))}</p>` : ''}
+              ${sanitizeUrl(venue.website_url) ? `<a href="${sanitizeUrl(venue.website_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
               ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
             </div>`
           )
@@ -921,15 +906,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     // --- 3D BUILDING MATCH: Light up OSM buildings for filtered venues ---
     if (mapRef.current && mapRef.current.getLayer('osm-3d-buildings')) {
       const venueMatchData = filteredVenues.map(venue => {
-        const vType = venue.type || '';
-        let category = 'Retail';
-        if (['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(vType)) {
-          category = 'Nightlife';
-        } else if (['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(vType)) {
-          category = 'Eatery';
-        } else if (['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(vType)) {
-          category = 'Stage';
-        }
+        const category = getVenueCategory(venue.type);
         return {
           id: venue.id,
           lng: venue.lng,
@@ -962,8 +939,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         </div>
       `;
 
-      const ticketCTA = evt.ticket_url 
-        ? `<a href="${evt.ticket_url}" target="_blank" style="display:block; margin-top: 12px; width: 100%; text-align: center; padding: 6px; background: #db2777; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">🎟️ BUY TICKETS</a>`
+      const safeTicketUrl = sanitizeUrl(evt.ticket_url);
+      const ticketCTA = safeTicketUrl 
+        ? `<a href="${safeTicketUrl}" target="_blank" rel="noopener noreferrer" style="display:block; margin-top: 12px; width: 100%; text-align: center; padding: 6px; background: #db2777; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">🎟️ BUY TICKETS</a>`
         : `<div style="margin-top: 12px; width: 100%; text-align: center; padding: 6px; background: #10b981; color: white; border-radius: 6px; font-size: 12px; font-weight: bold;">FREE EVENT</div>`;
 
       if (preferences?.autoRoute) {
@@ -977,7 +955,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         .setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 4px; min-width: 160px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 14px;">${evt.name}</h3>
+              <h3 style="margin: 0; font-weight: bold; font-size: 14px;">${escapeHtml(evt.name)}</h3>
               <p style="margin: 4px 0 0 0; font-size: 11px; color: #444;">${new Date(evt.start_time).toLocaleDateString()} @ ${new Date(evt.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
               ${ticketCTA}
             </div>`

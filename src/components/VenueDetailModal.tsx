@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Venue, Promotion, Event } from '@/types';
 import SecureQR from '@/components/SecureQR';
 import { X, MapPin, Clock, Globe, Calendar, AlertTriangle, Tag, Ticket, ChevronRight } from 'lucide-react';
+import { sanitizeUrl } from '@/components/map/mapHelpers';
 
 interface ConstructionWarning {
   id: string;
@@ -72,11 +73,23 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
     .slice(0, 5);
 
-  // Find nearby construction warnings (within ~200m of venue)
+  // Find nearby construction warnings
+  // Uses a simple bounding-box check (~300m radius around the venue)
   const nearbyConstruction = constructionWarnings.filter(w => {
-    // Simple proximity check — all construction markers are in the downtown core
-    // Since the venue is also in the core, show all active warnings
-    return true;
+    // Known project coordinates (must match InteractiveMap locationCoords)
+    const locationCoords: Record<string, [number, number]> = {
+      'renew-ontario-st': [-81.2435, 42.9870],
+      'renew-queens-bridge': [-81.2540, 42.9830],
+      'renew-brt-east': [-81.2380, 42.9830],
+      'renew-wellington-gateway': [-81.2483, 42.9700],
+      'renew-york-wellington': [-81.2483, 42.9840],
+    };
+    const coords = locationCoords[w.id];
+    if (!coords) return false;
+    // ~300m proximity check (approx 0.003 degrees)
+    const dlat = Math.abs(venue.lat - coords[1]);
+    const dlng = Math.abs(venue.lng - coords[0]);
+    return dlat < 0.003 && dlng < 0.004;
   }).slice(0, 3);
 
   // Merge situation tags from venue + active promos
@@ -193,10 +206,10 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                   </div>
                 )}
                 
-                {venue.website_url && (
+                {sanitizeUrl(venue.website_url) && (
                   <div className="flex items-center gap-3 text-neutral-300">
                     <Globe className="w-5 h-5 text-cyan-400 shrink-0" />
-                    <a href={venue.website_url} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-400 hover:text-cyan-300 underline underline-offset-2">
+                    <a href={sanitizeUrl(venue.website_url)!} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-400 hover:text-cyan-300 underline underline-offset-2">
                       Visit Website
                     </a>
                   </div>
@@ -270,9 +283,9 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                             <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{evt.description}</p>
                           )}
                         </div>
-                        {evt.ticket_url ? (
+                        {sanitizeUrl(evt.ticket_url) ? (
                           <a
-                            href={evt.ticket_url}
+                            href={sanitizeUrl(evt.ticket_url)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="shrink-0 flex items-center gap-1 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-lg shadow-pink-600/30"

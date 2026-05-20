@@ -144,3 +144,44 @@ export const escapeHtml = (unsafe: string | null | undefined): string => {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 };
+
+/**
+ * Shared venue category type lists — single source of truth.
+ * Used for filtering, marker coloring, and 3D building matching.
+ */
+export const VENUE_CATEGORIES = {
+  Nightlife: ['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'],
+  Eatery: ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'],
+  Stage: ['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'],
+} as const;
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  Nightlife: '#d946ef',
+  Eatery: '#f97316',
+  Stage: '#eab308',
+  Retail: '#64748b',
+};
+
+/** Resolves a venue type string to its display category. */
+export function getVenueCategory(type: string | null | undefined): 'Nightlife' | 'Eatery' | 'Stage' | 'Retail' {
+  const vType = type || '';
+  if ((VENUE_CATEGORIES.Nightlife as readonly string[]).includes(vType)) return 'Nightlife';
+  if ((VENUE_CATEGORIES.Eatery as readonly string[]).includes(vType)) return 'Eatery';
+  if ((VENUE_CATEGORIES.Stage as readonly string[]).includes(vType)) return 'Stage';
+  return 'Retail';
+}
+
+/**
+ * Validates a URL is safe to use in an href attribute.
+ * Blocks javascript:, data:, and other non-http protocols.
+ */
+export function sanitizeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return url;
+    return null;
+  } catch {
+    return null;
+  }
+}
