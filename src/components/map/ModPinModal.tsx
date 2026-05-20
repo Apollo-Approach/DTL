@@ -18,9 +18,10 @@ interface ModPinModalProps {
 }
 
 const INCIDENT_CATEGORIES = [
-  { id: 'OPEN_AIR_DRUGS', label: 'Open-Air Drug Use / Trade', icon: '💉' },
-  { id: 'CRISIS_PERSON', label: 'Person in Crisis', icon: '🆘' },
-  { id: 'CROWD_ESCALATION', label: 'Loud / Crowd Escalation', icon: '🗣️' },
+  { id: 'POSSIBLE_OD', label: 'Possible Overdose', icon: '💊' },
+  { id: 'OPEN_AIR_DRUGS', label: 'Open-Air Use / Trade', icon: '🔄' },
+  { id: 'CROWD_NOISE', label: 'Crowd / Noise Issue', icon: '📢' },
+  { id: 'CLEANUP', label: 'Cleanup Needed', icon: '🧹' },
 ] as const;
 
 export default function ModPinModal({

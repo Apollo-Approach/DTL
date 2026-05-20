@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
-import { Venue, Event, SafetyIncident, Preferences } from '@/types';
+import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
 import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
@@ -22,11 +22,12 @@ interface InteractiveMapProps {
   venues: Venue[]; 
   incidents: SafetyIncident[];
   events?: Event[];
+  promos?: Promotion[];
   preferences?: Preferences | null;
   mode?: 'public' | 'crisis';
 }
 
-export default function InteractiveMap({ venues = [], incidents = [], events = [], preferences = null, mode = 'public' }: InteractiveMapProps) {
+export default function InteractiveMap({ venues = [], incidents = [], events = [], promos = [], preferences = null, mode = 'public' }: InteractiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -760,7 +761,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       }
     });
 
-    // Draw Venues
+    // Draw Venues (invisible click targets — 3D buildings are the visual)
     filteredVenues.forEach((venue) => {
       if (!mapRef.current) return;
       const el = document.createElement('div');
@@ -782,20 +783,18 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         markerColor = '#06b6d4';
       }
 
-      // Modern Map Pin Iconography for Venues
-      el.className = 'group relative flex items-center justify-center cursor-pointer';
-      el.innerHTML = `
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="${markerColor}" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-lg group-hover:scale-110 transition-transform origin-bottom pointer-events-none">
-          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-          <circle cx="12" cy="10" r="3" fill="white"/>
-        </svg>
-        ${isPopUp ? '<span class="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>' : ''}
-      `;
+      // Check if this venue has active specials/promotions
+      const hasActiveSpecials = promos.some(p => p.venue_id === venue.id);
 
-      if (preferences?.autoRoute) {
-        el.addEventListener('click', () => {
-          (window as any).requestSafeWalk(venue.lng, venue.lat);
-        });
+      // Invisible click target with optional specials pulse glow
+      el.className = 'group relative flex items-center justify-center cursor-pointer';
+      el.style.width = '28px';
+      el.style.height = '28px';
+      el.innerHTML = hasActiveSpecials
+        ? `<span class="absolute inset-0 rounded-full animate-pulse" style="background: radial-gradient(circle, ${markerColor}88 0%, transparent 70%); box-shadow: 0 0 12px ${markerColor}66, 0 0 24px ${markerColor}33;"></span>`
+        : '';
+      if (isPopUp) {
+        el.innerHTML += '<span class="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>';
       }
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
@@ -947,7 +946,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       markersRef.current.push(marker);
     });
 
-  }, [venues, incidents, localIncidentUpdates, events, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences, mode]);
+  }, [venues, incidents, localIncidentUpdates, events, promos, searchQuery, dateFilter, layerToggles.incidents, timeFilter, activeFilter, forYou, preferences, mode]);
 
   // Handle Map Decluttering — retail 3D buildings
   useEffect(() => {

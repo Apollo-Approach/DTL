@@ -11,16 +11,17 @@ const InteractiveMap = dynamic(() => import('./InteractiveMap'), {
   ),
 });
 
-import { Venue, SafetyIncident, Event, Preferences } from '@/types';
+import { Venue, SafetyIncident, Event, Preferences, Promotion } from '@/types';
 
 interface MapWrapperProps {
   venues: Venue[];
   incidents: SafetyIncident[];
   events: Event[];
+  promos?: Promotion[];
   preferences?: Preferences | null;
   mode?: 'public' | 'crisis';
 }
 
-export default function MapWrapper({ venues, incidents, events, preferences, mode = 'public' }: MapWrapperProps) {
-  return <InteractiveMap venues={venues} incidents={incidents} events={events} preferences={preferences} mode={mode} />;
+export default function MapWrapper({ venues, incidents, events, promos = [], preferences, mode = 'public' }: MapWrapperProps) {
+  return <InteractiveMap venues={venues} incidents={incidents} events={events} promos={promos} preferences={preferences} mode={mode} />;
 }

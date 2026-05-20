@@ -96,7 +96,7 @@ export default async function Home() {
         {/* CHUNK 2 & 3: MAP, SEARCH, AND SAFETY MODERATION */}
         {/* The InteractiveMap component will handle the Neon Bubbles (Chunk 2) and Mod Pin CTA (Chunk 3) */}
         <section className="w-full max-w-full min-w-0 relative z-10 flex flex-col gap-4">
-          <MapWrapper venues={venues} incidents={incidents} events={events} preferences={preferences} />
+          <MapWrapper venues={venues} incidents={incidents} events={events} promos={promos} preferences={preferences} />
         </section>
 
         {/* CHUNK 4: JOIN CTA */}
