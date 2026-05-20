@@ -366,9 +366,12 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             paint: {
               'fill-extrusion-color': [
                 'case',
-                ['==', ['get', 'isDelayed'], true], '#888888', // Grey if delayed/stale
-                ['==', ['get', 'occupancyStatus'], 0], '#3b82f6', // Standard blue if empty (no green highlight)
-                '#00b296' // Default teal
+                ['==', ['get', 'isDelayed'], true], '#888888',         // Grey if delayed/stale
+                ['>=', ['get', 'occupancyStatus'], 5], '#dc2626',      // Red — Full / Not Accepting
+                ['>=', ['get', 'occupancyStatus'], 3], '#ef4444',      // Red — Standing Room
+                ['==', ['get', 'occupancyStatus'], 2], '#eab308',      // Yellow — Few Seats
+                ['==', ['get', 'occupancyStatus'], 1], '#22c55e',      // Green — Many Seats
+                '#3b82f6' // Blue — No Data (status 0)
               ], 
               'fill-extrusion-height': 5.4,      // Height increased by 20% (from 4.5 to 5.4)
               'fill-extrusion-base': 0,
@@ -697,6 +700,33 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
         map.on('mouseenter', 'bia-retail-extrusion', () => map.getCanvas().style.cursor = 'pointer');
         map.on('mouseleave', 'bia-retail-extrusion', () => map.getCanvas().style.cursor = '');
+
+        // --- NIGHTLY HQ BEACON (430 Richmond St) ---
+        const hqEl = document.createElement('div');
+        hqEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;cursor:pointer;">
+            <span style="position:relative;display:flex;height:28px;width:28px;">
+              <span style="animation:ping 2s cubic-bezier(0,0,0.2,1) infinite;position:absolute;display:inline-flex;height:100%;width:100%;border-radius:50%;background:rgba(6,182,212,0.5);"></span>
+              <span style="position:relative;display:inline-flex;height:28px;width:28px;border-radius:50%;background:rgb(6,182,212);border:2px solid white;box-shadow:0 0 12px rgba(6,182,212,0.6);align-items:center;justify-content:center;font-size:13px;">🏠</span>
+            </span>
+            <span style="margin-top:3px;font-size:9px;font-weight:800;color:#06b6d4;text-transform:uppercase;letter-spacing:0.1em;text-shadow:0 1px 3px rgba(0,0,0,0.8);white-space:nowrap;">Nightly HQ</span>
+          </div>
+        `;
+        hqEl.className = 'z-50';
+        new maplibregl.Marker({ element: hqEl })
+          .setLngLat([-81.2498, 42.9844])
+          .setPopup(
+            new maplibregl.Popup({ offset: 25, closeButton: true }).setHTML(
+              `<div style="color:#000;font-family:sans-serif;padding:8px;min-width:200px;">
+                <h3 style="margin:0 0 6px;font-weight:900;font-size:15px;color:#0891b2;">🏠 DTL Nightly HQ</h3>
+                <p style="margin:0 0 4px;font-size:12px;color:#444;">430 Richmond St, London ON</p>
+                <p style="margin:0 0 8px;font-size:11px;color:#666;">Street Liaison base of operations.<br/>Open nightly during activation hours.</p>
+                <p style="margin:0;font-size:10px;color:#888;font-style:italic;">Always visible on the map.</p>
+              </div>`
+            )
+          )
+          .addTo(map);
+
         // Cleanup
         map.on('remove', () => {
           clearInterval(civicInterval);

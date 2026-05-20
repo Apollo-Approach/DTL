@@ -57,14 +57,14 @@ export function getBusPolygon(lng: number, lat: number, bearing: number) {
 
 export const getOccupancyText = (status: number) => {
   switch(status) {
-    case 0: return "Empty";
+    case 0: return "No Data";
     case 1: return "Many Seats Available";
     case 2: return "Few Seats Available";
     case 3: return "Standing Room Only";
     case 4: return "Crushed Standing Room";
     case 5: return "Full";
     case 6: return "Not Accepting Passengers";
-    default: return "Unknown";
+    default: return "No Data";
   }
 };
 
