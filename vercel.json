@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/log-transit-delay",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/ingest-events",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 1 * * *"
     }
   ]
 }
