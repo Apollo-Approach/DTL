@@ -10,6 +10,7 @@ import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
 import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
 import { BusState, getBusPolygon, getOccupancyText, getOccupancyColor, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
+import { initBuildingExtrusions, matchVenuesToBuildings, startShimmerAnimation, stopShimmerAnimation, destroyBuildingExtrusions } from './map/buildingExtrusions';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
 import IncidentActionPanel from './crisis/IncidentActionPanel';
@@ -786,11 +787,19 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         // Refresh construction data every 5 minutes
         const constructionInterval = setInterval(fetchConstruction, 300000);
 
+        // --- 3D BUILDING EXTRUSIONS (The Nuclear Option) ---
+        // Initialize the OSM-sourced 3D fill-extrusion layer
+        initBuildingExtrusions(map, firstSymbolId);
+        // Start the shimmer animation loop for specials-active buildings
+        startShimmerAnimation(map);
+
         // Cleanup
         map.on('remove', () => {
           clearInterval(civicInterval);
           clearInterval(constructionInterval);
           if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+          stopShimmerAnimation();
+          destroyBuildingExtrusions(map);
         });
 
         // --- MOD PIN (CRISIS ALERT) CLICK HANDLER ---
@@ -908,6 +917,32 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       
       markersRef.current.push(marker);
     });
+
+    // --- 3D BUILDING MATCH: Light up OSM buildings for filtered venues ---
+    if (mapRef.current && mapRef.current.getLayer('osm-3d-buildings')) {
+      const venueMatchData = filteredVenues.map(venue => {
+        const vType = venue.type || '';
+        let category = 'Retail';
+        if (['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'].includes(vType)) {
+          category = 'Nightlife';
+        } else if (['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(vType)) {
+          category = 'Eatery';
+        } else if (['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'].includes(vType)) {
+          category = 'Stage';
+        }
+        return {
+          id: venue.id,
+          lng: venue.lng,
+          lat: venue.lat,
+          category,
+          hasSpecials: promos.some(p => p.venue_id === venue.id),
+        };
+      });
+      // Defer matching slightly to ensure tiles are loaded at current viewport
+      setTimeout(() => {
+        if (mapRef.current) matchVenuesToBuildings(mapRef.current, venueMatchData);
+      }, 500);
+    }
 
     // Draw Events (🎫)
     const filteredEvents = layerToggles.events ? events.filter(evt => {

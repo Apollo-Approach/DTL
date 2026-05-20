@@ -29,6 +29,7 @@ export const VenueSchema = z.object({
   website_url: z.string().optional(),
   late_night_eligible: z.boolean().optional(),
   offerings: z.any().optional(),
+  situation_tags: z.array(z.string()).optional(),
 });
 
 export const EventSchema = z.object({
@@ -127,6 +128,7 @@ export interface Promotion {
   active_until_time?: string; // HH:MM
   source_platform?: string;
   source_url?: string;
+  situation_tags?: string[];
 }
 
 export interface Habits {
