@@ -13,8 +13,11 @@ export interface BusState {
   directionId: number;
   headsign: string;
   routeId: string;
+  tripId: string | null;
   speed: number;
   isDelayed: boolean;
+  delaySeconds: number | null;
+  delayLabel: string | null;
   currentStatus: number;
   stopId: string;
   occupancyStatus: number;

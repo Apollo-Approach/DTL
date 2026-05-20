@@ -523,7 +523,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
               type: 'Feature', geometry: { type: 'Polygon', coordinates: getBusPolygon(bus.currentLng, bus.currentLat, bus.bearing) },
               properties: { 
                 id: bus.id, routeId: bus.routeId, routeLabel: routeLabel, headsign: fullHeadsign, centerLng: bus.currentLng, centerLat: bus.currentLat, 
-                speed: bus.speed, isDelayed: bus.isDelayed, currentStatus: bus.currentStatus, 
+                speed: bus.speed, isDelayed: bus.isDelayed, delaySeconds: bus.delaySeconds, delayLabel: bus.delayLabel, currentStatus: bus.currentStatus, 
                 stopId: bus.stopId, directionId: bus.directionId, occupancyStatus: bus.occupancyStatus, 
                 occupancyPercentage: bus.occupancyPercentage, hasOccupancyData: bus.hasOccupancyData, timestamp: bus.timestamp 
               }
@@ -602,9 +602,25 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
           );
 
           const ageMins = Math.floor((Date.now() / 1000 - props.timestamp) / 60);
-          const delayHTML = props.isDelayed 
-            ? `<div style="color:#ef4444; font-size:11px; font-weight:bold; margin-top:2px;">⚠️ Delayed (Ping ${ageMins}m ago)</div>`
-            : '';
+          
+          // ── Smart delay display: prefer TripUpdates exact data, fall back to ping-age ──
+          let delayHTML = '';
+          if (props.delayLabel && props.delaySeconds !== null && props.delaySeconds !== undefined) {
+            const delaySec = Number(props.delaySeconds);
+            if (delaySec > 120) {
+              // Late (>2 min)
+              delayHTML = `<div style="color:#ef4444; font-size:11px; font-weight:bold; margin-top:2px;">⚠️ ${props.delayLabel}</div>`;
+            } else if (delaySec < -60) {
+              // Early
+              delayHTML = `<div style="color:#22c55e; font-size:11px; font-weight:bold; margin-top:2px;">🟢 ${props.delayLabel}</div>`;
+            } else {
+              // On time
+              delayHTML = `<div style="color:#22c55e; font-size:11px; font-weight:bold; margin-top:2px;">✅ On time</div>`;
+            }
+          } else if (props.isDelayed) {
+            // Fallback: old ping-age heuristic
+            delayHTML = `<div style="color:#ef4444; font-size:11px; font-weight:bold; margin-top:2px;">⚠️ Stale (Ping ${ageMins}m ago)</div>`;
+          }
             
           const occText = getOccupancyText(props.occupancyStatus, props.occupancyPercentage, props.hasOccupancyData);
           const statText = getStatusText(props.currentStatus);
