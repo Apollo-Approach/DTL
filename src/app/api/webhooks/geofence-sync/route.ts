@@ -237,7 +237,7 @@ export async function POST(request: Request) {
  * GET — Returns the latest sync payload for clients to pull.
  * Used as a fallback when FCM silent push is throttled by iOS.
  */
-export async function GET(request: Request) {
+export async function GET() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

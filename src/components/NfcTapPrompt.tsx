@@ -10,7 +10,7 @@
 // On unsupported devices (iOS, desktop), this component renders nothing.
 // Those users rely on the physical QR code printed alongside the NFC tag.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 type NfcState = 'idle' | 'scanning' | 'success' | 'error';
 
@@ -22,11 +22,12 @@ interface NfcTapPromptProps {
 export default function NfcTapPrompt({ className }: NfcTapPromptProps) {
   const [state, setState] = useState<NfcState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSupported, setIsSupported] = useState(false);
 
-  // Only render on devices that support Web NFC
-  if (typeof window === 'undefined' || !('NDEFReader' in window)) {
-    return null;
-  }
+  // Check NFC support after mount — avoids SSR/client hook mismatch
+  useEffect(() => {
+    setIsSupported('NDEFReader' in window);
+  }, []);
 
   const handleTap = useCallback(async () => {
     setState('scanning');
@@ -72,6 +73,11 @@ export default function NfcTapPrompt({ className }: NfcTapPromptProps) {
       }
     }
   }, []);
+
+  // Don't render on unsupported devices — checked via useEffect to satisfy Rules of Hooks
+  if (!isSupported) {
+    return null;
+  }
 
   return (
     <>

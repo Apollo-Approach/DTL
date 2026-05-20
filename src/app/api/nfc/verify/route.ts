@@ -12,6 +12,15 @@ import { verifyNfcTap } from '@/lib/nfc/sdmVerifier';
 
 export const dynamic = 'force-dynamic';
 
+/** Prefer stable production URL over deployment-specific preview URL. */
+function getBaseUrl(): string {
+  const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const deployUrl = process.env.VERCEL_URL;
+  if (productionUrl) return `https://${productionUrl}`;
+  if (deployUrl) return `https://${deployUrl}`;
+  return 'http://localhost:3000';
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
@@ -32,22 +41,16 @@ export async function GET(request: Request) {
 
   const result = await verifyNfcTap(tagShortId, encPiccData, cmac, userAgent, ipAddress);
 
+  const baseUrl = getBaseUrl();
+
   if (result.success && result.couponToken) {
     // 302 redirect to the redemption page
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000';
-
     return NextResponse.redirect(`${baseUrl}/redeem/${result.couponToken}`, {
       status: 302,
     });
   }
 
   // Error redirect with reason code
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-
   return NextResponse.redirect(
     `${baseUrl}/redeem/error?reason=${result.error ?? 'internal_error'}`,
     { status: 302 }

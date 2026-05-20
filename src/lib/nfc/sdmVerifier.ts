@@ -194,19 +194,33 @@ export async function verifyNfcTap(
     const couponToken = generateCouponToken();
     const expiresAt = new Date(Date.now() + tag.coupon_expiry_minutes * 60 * 1000);
 
-    // 8. Update tag counter (atomic)
-    const { error: updateErr } = await supabase
+    // 8. Update tag counter (atomic) — verify exactly 1 row is updated
+    const { error: updateErr, count: updatedRows } = await supabase
       .from('nfc_tags')
       .update({
         last_tap_counter: tapCounter,
         updated_at: new Date().toISOString(),
-      })
+      },
+      { count: 'exact' })
       .eq('id', tag.id)
       .lt('last_tap_counter', tapCounter); // Ensure no race condition
 
     if (updateErr) {
       console.error('[NFC] Counter update failed:', updateErr.message);
       return { success: false, error: 'internal_error' };
+    }
+
+    // If 0 rows matched, another request won the race — treat as replay
+    if (updatedRows === 0) {
+      await logTap(supabase, {
+        tag_id: tag.id,
+        tap_counter: tapCounter,
+        verified: true,
+        replay_attempt: true,
+        user_agent: userAgent,
+        ip_address: ipAddress,
+      });
+      return { success: false, error: 'already_used' };
     }
 
     // 9. Log the successful tap

@@ -4,7 +4,8 @@
 // Interactive client component for the redemption page.
 // Features: countdown timer, animated states, QR code for staff scanning.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import QRCode from 'qrcode';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -336,8 +337,7 @@ export default function RedemptionClient({
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .qr-code canvas,
-        .qr-code img {
+        .qr-code canvas {
           display: block;
         }
 
@@ -485,7 +485,7 @@ export default function RedemptionClient({
 
               <div className="qr-section">
                 <div className="qr-label">Or staff can scan this code</div>
-                <QRCode value={`dtl-verify:${token}`} />
+                <StaffQRCode value={`dtl-verify:${token}`} />
                 <div className="token-display">{token}</div>
               </div>
             </>
@@ -520,43 +520,28 @@ export default function RedemptionClient({
 }
 
 // ────────────────────────────────────────────────────────────
-// Minimal QR Code (canvas-based, no dependency)
+// QR Code (canvas-based, using qrcode library)
+// Preserves case-sensitive tokens like Brave-Golden-Orca
 // ────────────────────────────────────────────────────────────
 
-function QRCode({ value }: { value: string }) {
-  const canvasRef = useCallback(
-    (canvas: HTMLCanvasElement | null) => {
-      if (!canvas) return;
-      // Dynamically import the lightweight QR generator
-      import('./qrEncoder').then(({ encode }) => {
-        const modules = encode(value);
-        const size = 180;
-        const moduleSize = size / modules.length;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+function StaffQRCode({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-        canvas.width = size;
-        canvas.height = size;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = '#09090b';
+  useEffect(() => {
+    if (!canvasRef.current) return;
 
-        for (let row = 0; row < modules.length; row++) {
-          for (let col = 0; col < modules[row].length; col++) {
-            if (modules[row][col]) {
-              ctx.fillRect(
-                col * moduleSize,
-                row * moduleSize,
-                moduleSize + 0.5,
-                moduleSize + 0.5
-              );
-            }
-          }
-        }
-      });
-    },
-    [value]
-  );
+    QRCode.toCanvas(canvasRef.current, value, {
+      width: 180,
+      margin: 0,
+      color: {
+        dark: '#09090b',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    }).catch((err: Error) => {
+      console.error('[QR] Generation failed:', err.message);
+    });
+  }, [value]);
 
   return (
     <div className="qr-code">
