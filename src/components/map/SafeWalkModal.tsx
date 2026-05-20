@@ -100,13 +100,17 @@ export default function SafeWalkModal({ onStart, onCancel }: SafeWalkModalProps)
                 ))}
               </div>
             </div>
-            <div className="pt-2">
+            <div className="pt-2 space-y-3">
               <button 
                 onClick={onCancel}
                 className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl border border-neutral-700 transition-colors"
               >
                 Cancel
               </button>
+              <a href="tel:911" className="flex items-center justify-center gap-2 text-xs text-neutral-500 hover:text-red-400 transition-colors py-1">
+                <span>🚨</span>
+                <span>In danger right now? Call 911</span>
+              </a>
             </div>
           </>
         ) : (

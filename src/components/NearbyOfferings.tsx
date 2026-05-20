@@ -18,18 +18,32 @@ export default function NearbyOfferings({ venues, promos, preferences }: NearbyO
   const [forYou, setForYou] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
 
-  // Compute matched venues
-  const displayVenues = useMemo(() => {
-    if (!forYou || !preferences) return venues;
+  // Default center: Richmond & Dundas intersection
+  const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
 
-    return venues
-      .map(v => {
-        const score = calculateMatchScore(v.offerings, preferences);
-        return { ...v, matchScore: score };
-      })
-      // Only show if score is >= 20 (or whatever threshold) when "For You" is on
-      .filter(v => v.matchScore >= 20)
-      .sort((a, b) => b.matchScore - a.matchScore);
+  // Compute matched venues — max 7, sorted by proximity or match score
+  const displayVenues = useMemo(() => {
+    const distanceTo = (v: Venue) => {
+      const dlat = v.lat - DTL_CENTER.lat;
+      const dlng = v.lng - DTL_CENTER.lng;
+      return Math.sqrt(dlat * dlat + dlng * dlng);
+    };
+
+    if (forYou && preferences) {
+      return venues
+        .map(v => ({
+          ...v,
+          matchScore: calculateMatchScore(v.offerings, preferences),
+        }))
+        .filter(v => v.matchScore >= 20)
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 7);
+    }
+
+    // Default: sort by proximity to Richmond & Dundas, take top 7
+    return [...venues]
+      .sort((a, b) => distanceTo(a) - distanceTo(b))
+      .slice(0, 7);
   }, [venues, preferences, forYou]);
 
   return (
