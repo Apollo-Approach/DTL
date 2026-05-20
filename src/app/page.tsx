@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import Script from 'next/script';
 import CommunityFeed from '@/components/CommunityFeed';
 import SecureQR from '@/components/SecureQR';
-import SafetyTicker from '@/components/SafetyTicker';
+import SafetyDashboard from '@/components/SafetyDashboard';
 import NearbyOfferings from '@/components/NearbyOfferings';
 
 // Force Next.js to dynamically render this page so it never caches stale safety data
@@ -84,8 +84,7 @@ export default async function Home() {
         </div>
       </header>
 
-      {/* Phase 3.3: Civic Safety Ticker */}
-      <SafetyTicker />
+
 
       {/* Mobile-First Content Flow */}
       <div className="flex flex-col gap-8 flex-grow w-full min-w-0">
@@ -98,6 +97,9 @@ export default async function Home() {
         <section className="w-full max-w-full min-w-0 relative z-10 flex flex-col gap-4">
           <MapWrapper venues={venues} incidents={incidents} events={events} promos={promos} preferences={preferences} />
         </section>
+
+        {/* SAFETY MODERATION DASHBOARD */}
+        <SafetyDashboard />
 
         {/* CHUNK 4: JOIN CTA */}
         <section className="w-full mt-4 bg-gradient-to-r from-purple-900/30 to-cyan-900/30 border border-purple-500/30 rounded-2xl p-8 text-center shadow-2xl">

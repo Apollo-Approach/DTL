@@ -12,8 +12,6 @@ import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
 import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
-import SafeWalkModal from './map/SafeWalkModal';
-import SafeWalkOverlay from './map/SafeWalkOverlay';
 import IncidentActionPanel from './crisis/IncidentActionPanel';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
@@ -33,8 +31,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const markersRef = useRef<maplibregl.Marker[]>([]);
   
   // SafeWalk State
-  const [showSafeWalkModal, setShowSafeWalkModal] = useState(false);
-  const [safeWalkExpiresAt, setSafeWalkExpiresAt] = useState<number | null>(null);
+
   
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -139,6 +136,13 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
+
+  // Listen for pin mode toggle from SafetyDashboard
+  useEffect(() => {
+    const handler = () => togglePinMode();
+    window.addEventListener('dtl:toggle-pin-mode', handler);
+    return () => window.removeEventListener('dtl:toggle-pin-mode', handler);
+  }, []);
 
   const animationFrameRef = useRef<number | undefined>(undefined);
 
@@ -1138,30 +1142,27 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         userRole={userRole}
       />
 
-      {/* SAFETY MODERATION INTERFACE (Report Incident CTA) */}
-      {session && !session.user.is_anonymous && (
-        <div className="w-full flex flex-col gap-2">
-          {['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
-            <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
-              <div>
-                <h4 className="text-white font-bold text-sm">Broadcast Location</h4>
-                <p className="text-xs text-neutral-400">Share your live GPS with other Responders</p>
-              </div>
-              <button 
-                onClick={() => setBroadcastLocation(!broadcastLocation)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${broadcastLocation ? 'bg-indigo-500' : 'bg-neutral-600'}`}
-              >
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${broadcastLocation ? 'translate-x-6' : 'translate-x-0'}`} />
-              </button>
-            </div>
-          )}
-
+      {/* MOD BROADCAST TOGGLE (Responders only) */}
+      {session && !session.user.is_anonymous && ['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'].includes(userRole) && (
+        <div className="flex items-center justify-between p-4 bg-neutral-900 border border-neutral-700 rounded-xl">
+          <div>
+            <h4 className="text-white font-bold text-sm">Broadcast Location</h4>
+            <p className="text-xs text-neutral-400">Share your live GPS with other Responders</p>
+          </div>
           <button 
-            onClick={togglePinMode}
-            className={`w-full py-4 rounded-xl font-black text-lg shadow-xl transition-all border-2 ${isPinMode ? 'bg-red-900/80 text-red-100 border-red-500 animate-pulse shadow-red-500/20' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-500'}`}
+            onClick={() => setBroadcastLocation(!broadcastLocation)}
+            className={`w-12 h-6 rounded-full transition-colors relative ${broadcastLocation ? 'bg-indigo-500' : 'bg-neutral-600'}`}
           >
-            {isPinMode ? '🎯 TAP MAP TO DROP PIN' : '⚠️ REPORT STREET INCIDENT'}
+            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${broadcastLocation ? 'translate-x-6' : 'translate-x-0'}`} />
           </button>
+        </div>
+      )}
+
+      {/* Pin Mode Indicator */}
+      {isPinMode && (
+        <div className="w-full py-3 px-4 bg-cyan-900/40 border border-cyan-700 rounded-xl flex items-center justify-between animate-in fade-in duration-300">
+          <span className="text-cyan-300 font-bold text-sm">🎯 Tap the map to drop a pin</span>
+          <button onClick={togglePinMode} className="text-xs text-cyan-400 hover:text-white font-bold px-3 py-1 bg-cyan-900/50 rounded-lg transition-colors">Cancel</button>
         </div>
       )}
 
@@ -1180,47 +1181,6 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             setPinDescription={setPinDescription}
             mapRef={mapRef}
             supabase={supabase}
-          />
-        )}
-
-        {/* SafeWalk Floating Button */}
-        {!safeWalkExpiresAt && !showSafeWalkModal && (
-          <button 
-            onClick={() => setShowSafeWalkModal(true)}
-            className="absolute bottom-10 right-4 z-40 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-900/50 flex flex-col items-center justify-center transition-transform active:scale-95 border-2 border-emerald-400"
-            title="SafeWalk Timer"
-          >
-            <span className="text-xl">🛡️</span>
-            <span className="text-[9px] font-bold uppercase tracking-tighter mt-0.5">SafeWalk</span>
-          </button>
-        )}
-
-        {/* SafeWalk Modal */}
-        {showSafeWalkModal && (
-          <SafeWalkModal 
-            onCancel={() => setShowSafeWalkModal(false)}
-            onStart={(mins) => {
-              // Ask for location permission eagerly
-              if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(() => {
-                  setSafeWalkExpiresAt(Date.now() + mins * 60000);
-                  setShowSafeWalkModal(false);
-                }, (err) => {
-                  alert('SafeWalk requires Location Access to dispatch help to your location. Please enable it.');
-                });
-              } else {
-                alert('Geolocation is not supported by your browser.');
-              }
-            }}
-          />
-        )}
-
-        {/* SafeWalk Active Overlay */}
-        {safeWalkExpiresAt && (
-          <SafeWalkOverlay 
-            expiresAt={safeWalkExpiresAt}
-            onSafe={() => setSafeWalkExpiresAt(null)}
-            onExtend={(mins) => setSafeWalkExpiresAt(prev => (prev ? prev + mins * 60000 : null))}
           />
         )}
 
