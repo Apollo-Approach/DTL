@@ -47,6 +47,10 @@ export default async function AdminLayout({
             <h1 className="font-bold text-sm">London Civic Dashboard</h1>
             <p className="text-xs text-indigo-400">Responder Gateway ({profile.role})</p>
           </div>
+          <div className="flex gap-4 ml-8">
+            <a href="/admin/dashboard" className="text-sm font-medium text-neutral-300 hover:text-white">Dashboard</a>
+            <a href="/admin/venues" className="text-sm font-medium text-neutral-300 hover:text-white">Venues</a>
+          </div>
         </div>
         
         <form action="/auth/signout" method="POST">
