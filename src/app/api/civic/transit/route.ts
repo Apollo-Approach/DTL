@@ -17,7 +17,23 @@ interface TransitBus {
   stopId: string;
   directionId: number;
   occupancyStatus: number;
-  occupancyPercentage?: number;
+  occupancyPercentage: number | null;
+  hasOccupancyData: boolean;
+}
+
+/**
+ * Derives occupancy status enum from a percentage value.
+ * Mirrors GTFS-RT OccupancyStatus mapping:
+ *   0% → EMPTY, 1-25% → MANY_SEATS, 26-50% → FEW_SEATS,
+ *   51-75% → STANDING_ROOM, 76-100% → CRUSHED, >100% → FULL
+ */
+function deriveStatusFromPercentage(pct: number): number {
+  if (pct <= 0) return 0;   // EMPTY
+  if (pct <= 25) return 1;  // MANY_SEATS_AVAILABLE
+  if (pct <= 50) return 2;  // FEW_SEATS_AVAILABLE
+  if (pct <= 75) return 3;  // STANDING_ROOM_ONLY
+  if (pct <= 100) return 4; // CRUSHED_STANDING_ROOM
+  return 5;                 // FULL
 }
 
 interface GtfsEntity {
@@ -89,8 +105,35 @@ export async function GET() {
           currentStatus: v.current_status ?? 0,
           stopId: v.stop_id || '',
           directionId: v.trip?.direction_id ?? 0,
-          occupancyStatus: v.occupancy_status ?? 0,
-          occupancyPercentage: v.occupancy_percentage
+          // ── Occupancy: Smart resolution ──
+          // If LTC provides occupancy_percentage, trust it as primary source.
+          // Only fall back to occupancy_status enum if percentage is absent.
+          // Mark hasOccupancyData = false when BOTH are missing to distinguish
+          // "no data" from "genuinely empty bus".
+          ...(() => {
+            const rawStatus = v.occupancy_status;
+            const rawPct = v.occupancy_percentage;
+            const hasStatus = rawStatus !== undefined && rawStatus !== null;
+            const hasPct = rawPct !== undefined && rawPct !== null;
+            const hasData = hasStatus || hasPct;
+
+            let finalStatus = 0;
+            let finalPct: number | null = null;
+
+            if (hasPct) {
+              finalPct = rawPct!;
+              // If status is 0 (default/EMPTY) but percentage says otherwise, derive from pct
+              finalStatus = (hasStatus && rawStatus! > 0) ? rawStatus! : deriveStatusFromPercentage(rawPct!);
+            } else if (hasStatus) {
+              finalStatus = rawStatus!;
+            }
+
+            return {
+              occupancyStatus: finalStatus,
+              occupancyPercentage: finalPct,
+              hasOccupancyData: hasData
+            };
+          })()
         });
       }
     });

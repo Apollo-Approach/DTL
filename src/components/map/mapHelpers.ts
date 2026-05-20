@@ -18,7 +18,8 @@ export interface BusState {
   currentStatus: number;
   stopId: string;
   occupancyStatus: number;
-  occupancyPercentage?: number;
+  occupancyPercentage: number | null;
+  hasOccupancyData: boolean;
   timestamp: number;
   bearing: number;
 }
@@ -55,16 +56,60 @@ export function getBusPolygon(lng: number, lat: number, bearing: number) {
   return [coords];
 }
 
-export const getOccupancyText = (status: number) => {
+/**
+ * Smart occupancy text resolver.
+ * Prioritizes percentage over enum status, and explicitly marks
+ * "No Data" when hasOccupancyData is false (fixing the "empty bus" bug
+ * where missing protobuf fields default to 0/EMPTY).
+ */
+export const getOccupancyText = (
+  status: number,
+  percentage?: number | null,
+  hasData?: boolean
+): string => {
+  // If the API explicitly tells us there's no data, show that
+  if (hasData === false) return 'No Data';
+
+  // If we have a percentage, use it as the primary label
+  if (percentage !== undefined && percentage !== null && percentage >= 0) {
+    if (percentage === 0) return 'Empty';
+    if (percentage <= 25) return 'Many Seats Available';
+    if (percentage <= 50) return 'Few Seats Available';
+    if (percentage <= 75) return 'Standing Room Only';
+    if (percentage <= 100) return 'Crushed Standing Room';
+    return 'Full';
+  }
+
+  // Fall back to enum status
   switch(status) {
-    case 0: return "No Data";
-    case 1: return "Many Seats Available";
-    case 2: return "Few Seats Available";
-    case 3: return "Standing Room Only";
-    case 4: return "Crushed Standing Room";
-    case 5: return "Full";
-    case 6: return "Not Accepting Passengers";
-    default: return "No Data";
+    case 0: return 'No Data';
+    case 1: return 'Many Seats Available';
+    case 2: return 'Few Seats Available';
+    case 3: return 'Standing Room Only';
+    case 4: return 'Crushed Standing Room';
+    case 5: return 'Full';
+    case 6: return 'Not Accepting Passengers';
+    default: return 'No Data';
+  }
+};
+
+/**
+ * Returns a color for the occupancy status, used in popup capacity bars.
+ */
+export const getOccupancyColor = (
+  status: number,
+  hasData?: boolean
+): string => {
+  if (hasData === false) return '#6b7280'; // grey
+  switch(status) {
+    case 0: return '#6b7280'; // grey — no data
+    case 1: return '#22c55e'; // green
+    case 2: return '#eab308'; // yellow
+    case 3: return '#f97316'; // orange
+    case 4: return '#ef4444'; // red
+    case 5: return '#dc2626'; // dark red
+    case 6: return '#991b1b'; // deep red
+    default: return '#6b7280';
   }
 };
 

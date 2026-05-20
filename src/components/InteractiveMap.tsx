@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
 import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
-import { BusState, getBusPolygon, getOccupancyText, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
+import { BusState, getBusPolygon, getOccupancyText, getOccupancyColor, getStatusText, getDirectionText, escapeHtml } from './map/mapHelpers';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
 import IncidentActionPanel from './crisis/IncidentActionPanel';
@@ -371,11 +371,13 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
               'fill-extrusion-color': [
                 'case',
                 ['==', ['get', 'isDelayed'], true], '#888888',         // Grey if delayed/stale
+                ['==', ['get', 'hasOccupancyData'], false], '#3b82f6', // Blue — No occupancy data reported
                 ['>=', ['get', 'occupancyStatus'], 5], '#dc2626',      // Red — Full / Not Accepting
                 ['>=', ['get', 'occupancyStatus'], 3], '#ef4444',      // Red — Standing Room
                 ['==', ['get', 'occupancyStatus'], 2], '#eab308',      // Yellow — Few Seats
                 ['==', ['get', 'occupancyStatus'], 1], '#22c55e',      // Green — Many Seats
-                '#3b82f6' // Blue — No Data (status 0)
+                ['==', ['get', 'occupancyStatus'], 0], '#10b981',      // Teal — Genuinely Empty (has data)
+                '#3b82f6' // Blue — fallback
               ], 
               'fill-extrusion-height': 5.4,      // Height increased by 20% (from 4.5 to 5.4)
               'fill-extrusion-base': 0,
@@ -523,7 +525,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
                 id: bus.id, routeId: bus.routeId, routeLabel: routeLabel, headsign: fullHeadsign, centerLng: bus.currentLng, centerLat: bus.currentLat, 
                 speed: bus.speed, isDelayed: bus.isDelayed, currentStatus: bus.currentStatus, 
                 stopId: bus.stopId, directionId: bus.directionId, occupancyStatus: bus.occupancyStatus, 
-                occupancyPercentage: bus.occupancyPercentage, timestamp: bus.timestamp 
+                occupancyPercentage: bus.occupancyPercentage, hasOccupancyData: bus.hasOccupancyData, timestamp: bus.timestamp 
               }
             });
             labelFeatures.push({
@@ -604,10 +606,14 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             ? `<div style="color:#ef4444; font-size:11px; font-weight:bold; margin-top:2px;">⚠️ Delayed (Ping ${ageMins}m ago)</div>`
             : '';
             
-          const occText = getOccupancyText(props.occupancyStatus);
+          const occText = getOccupancyText(props.occupancyStatus, props.occupancyPercentage, props.hasOccupancyData);
           const statText = getStatusText(props.currentStatus);
           const dirText = getDirectionText(props.directionId);
           const stopText = props.stopId ? `Stop #${props.stopId}` : 'Unknown Stop';
+          const occColor = getOccupancyColor(props.occupancyStatus, props.hasOccupancyData);
+          const pctDisplay = (props.hasOccupancyData && props.occupancyPercentage !== null && props.occupancyPercentage !== undefined)
+            ? props.occupancyPercentage : null;
+          const pctBarWidth = pctDisplay !== null ? Math.min(pctDisplay, 100) : 0;
 
           new maplibregl.Popup({ offset: 15 })
             .setLngLat([props.centerLng, props.centerLat])
@@ -616,7 +622,10 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
               ${delayHTML}
               <div style="margin-top:6px; font-size:12px; line-height:1.4;">
                 <div>📍 <strong>${statText}</strong> ${stopText}</div>
-                <div>👥 <strong>Occupancy:</strong> ${occText} ${props.occupancyPercentage !== undefined ? `(${props.occupancyPercentage}%)` : ''}</div>
+                <div>👥 <strong>Occupancy:</strong> ${occText}${pctDisplay !== null ? ` (${pctDisplay}%)` : ''}</div>
+                ${pctDisplay !== null ? `<div style="background:#1e293b; border-radius:4px; height:6px; width:100%; margin-top:3px;">
+                  <div style="background:${occColor}; height:100%; width:${pctBarWidth}%; border-radius:4px; transition:width 0.3s;"></div>
+                </div>` : ''}
                 <div>⏱️ <strong>Speed:</strong> ${(props.speed * 3.6).toFixed(1)} km/h</div>
               </div>
             </div>`)
