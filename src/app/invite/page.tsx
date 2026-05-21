@@ -17,7 +17,7 @@ export default function InviteWizard() {
     setError('');
     
     // Simple hardcoded codes for alpha
-    const validCodes = ['APOLLO', 'DTL2026', 'NICKALPHA'];
+    const validCodes = ['APOLLO', 'DTL2026', 'NICKALPHA', 'DEVONALPHA'];
     
     if (validCodes.includes(code.toUpperCase())) {
       setIsUnlocking(true);
