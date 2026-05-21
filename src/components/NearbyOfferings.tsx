@@ -117,14 +117,12 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
           matchScore: calculateMatchScore(v.offerings, preferences),
         }))
         .filter(v => v.matchScore >= 20)
-        .sort((a, b) => b.matchScore - a.matchScore)
-        .slice(0, 7);
+        .sort((a, b) => b.matchScore - a.matchScore);
     }
 
-    // Default: sort by proximity to Richmond & Dundas, take top 7
+    // Default: sort by proximity to Richmond & Dundas
     return [...filtered]
-      .sort((a, b) => distanceTo(a) - distanceTo(b))
-      .slice(0, 7);
+      .sort((a, b) => distanceTo(a) - distanceTo(b));
   }, [venues, preferences, forYou, activeSituationTag, promos]);
 
   return (
