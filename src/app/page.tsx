@@ -123,6 +123,14 @@ export default async function Home() {
         </section>
 
       </div>
+
+      <footer className="mt-12 border-t border-neutral-900 pt-8 pb-4 text-center text-xs text-neutral-500 font-medium tracking-wider flex flex-col md:flex-row items-center justify-center gap-4">
+        <p>&copy; {new Date().getFullYear()} DTL Nightly. All rights reserved.</p>
+        <div className="flex gap-4">
+          <Link href="/privacy" className="hover:text-cyan-400 transition-colors">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-cyan-400 transition-colors">Terms of Service</Link>
+        </div>
+      </footer>
     </main>
   );
 }
