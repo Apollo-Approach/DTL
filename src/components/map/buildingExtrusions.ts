@@ -92,8 +92,11 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
   });
 
   // --- Step C: Add the 3D fill-extrusion layer ---
-  // IMPORTANT: Only matched venue buildings should be visible.
-  // Unmatched buildings use opacity 0 so they don't paint the entire city.
+  // IMPORTANT: Only matched venue buildings are rendered.
+  // We use a feature-state filter so unmatched buildings never paint.
+  // NOTE: MapLibre does NOT support data expressions for fill-extrusion-opacity,
+  // so we cannot use feature-state to drive opacity. Instead we start with the
+  // layer hidden and programmatically update it after matching.
   if (!map.getLayer('osm-3d-buildings')) {
     map.addLayer({
       id: 'osm-3d-buildings',
@@ -103,10 +106,11 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
       minzoom: 14.5,
       paint: {
         // Color: driven by feature-state — only matched venues get color
+        // Unmatched buildings get transparent black, invisible against the dark basemap
         'fill-extrusion-color': [
           'coalesce',
           ['feature-state', 'venueColor'],
-          '#1a1a2e' // Dormant fallback (invisible due to opacity 0)
+          'rgba(0,0,0,0)' // Fully transparent — unmatched buildings disappear
         ],
         // Height: smooth zoom interpolation from flat → true height
         'fill-extrusion-height': [
@@ -120,13 +124,8 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
           14.5, 0,
           15.5, ['coalesce', ['get', 'render_min_height'], 0]
         ],
-        // Opacity: matched venues are visible, everything else is invisible.
-        // feature-state 'matched' is set to 1 for venue buildings.
-        'fill-extrusion-opacity': [
-          'case',
-          ['==', ['feature-state', 'matched'], 1], 0.85,
-          0 // All other buildings: fully transparent
-        ],
+        // Static opacity — MapLibre doesn't support data expressions here
+        'fill-extrusion-opacity': 0.85,
       },
     }, firstSymbolId);
   }
