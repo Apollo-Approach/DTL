@@ -77,15 +77,23 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
 
   // --- Step B: Dim existing flat building layers ---
   // The dataviz-dark style has "Building" and "Building top" as flat fills.
-  // We'll hide them so our 3D extrusions replace them entirely.
+  // We dim them to ~30% so the city retains subtle building outlines
+  // while our venue-matched 3D extrusions stand out prominently.
   const flatBuildingLayers = ['Building', 'Building top'];
   flatBuildingLayers.forEach(layerId => {
     if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', 'none');
+      try {
+        map.setPaintProperty(layerId, 'fill-opacity', 0.3);
+      } catch {
+        // Some styles may not support fill-opacity on this layer type
+        map.setLayoutProperty(layerId, 'visibility', 'none');
+      }
     }
   });
 
   // --- Step C: Add the 3D fill-extrusion layer ---
+  // IMPORTANT: Only matched venue buildings should be visible.
+  // Unmatched buildings use opacity 0 so they don't paint the entire city.
   if (!map.getLayer('osm-3d-buildings')) {
     map.addLayer({
       id: 'osm-3d-buildings',
@@ -94,12 +102,11 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
       'source-layer': 'building',
       minzoom: 14.5,
       paint: {
-        // Color: driven by feature-state, fallback to dormant dark
-        // coalesce resolves to the first non-null value
+        // Color: driven by feature-state — only matched venues get color
         'fill-extrusion-color': [
           'coalesce',
           ['feature-state', 'venueColor'],
-          '#1a1a2e' // Dormant: deep midnight blue-black
+          '#1a1a2e' // Dormant fallback (invisible due to opacity 0)
         ],
         // Height: smooth zoom interpolation from flat → true height
         'fill-extrusion-height': [
@@ -113,7 +120,13 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
           14.5, 0,
           15.5, ['coalesce', ['get', 'render_min_height'], 0]
         ],
-        'fill-extrusion-opacity': 0.85,
+        // Opacity: matched venues are visible, everything else is invisible.
+        // feature-state 'matched' is set to 1 for venue buildings.
+        'fill-extrusion-opacity': [
+          'case',
+          ['==', ['feature-state', 'matched'], 1], 0.85,
+          0 // All other buildings: fully transparent
+        ],
       },
     }, firstSymbolId);
   }
@@ -204,7 +217,7 @@ export function matchVenuesToBuildings(
     try {
       map.setFeatureState(
         { source: 'maptiler_planet', sourceLayer: 'building', id: featureId },
-        { venueColor: null },
+        { venueColor: null, matched: 0 },
       );
     } catch { /* Feature may no longer be rendered */ }
   });
@@ -250,11 +263,11 @@ export function matchVenuesToBuildings(
           state.shimmerBuildings.add(featureId);
         }
 
-        // Apply feature state color
+        // Apply feature state color + matched flag
         try {
           map.setFeatureState(
             { source: 'maptiler_planet', sourceLayer: 'building', id: featureId },
-            { venueColor: color },
+            { venueColor: color, matched: 1 },
           );
         } catch (err) {
           console.warn('[3D Buildings] Failed to set feature state:', err);
