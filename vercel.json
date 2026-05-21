@@ -1,13 +1,3 @@
 {
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/log-transit-delay",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/ingest-events",
-      "schedule": "0 1 * * *"
-    }
-  ]
+  "framework": "nextjs"
 }
