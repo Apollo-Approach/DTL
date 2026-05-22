@@ -26,7 +26,7 @@ export default function SafeWalkModal({ onStart, onCancel }: SafeWalkModalProps)
     }
 
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
@@ -78,10 +78,10 @@ export default function SafeWalkModal({ onStart, onCancel }: SafeWalkModalProps)
                 1. Select a time limit for your trip.
               </p>
               <p className="text-xs text-neutral-300">
-                2. If you don't tap "I'm Safe" before the timer runs out, your phone will sound an alarm.
+                2. If you don&apos;t tap &quot;I&apos;m Safe&quot; before the timer runs out, your phone will sound an alarm.
               </p>
               <p className="text-xs text-neutral-300">
-                3. If the alarm isn't disabled, an SOS pin is anonymously dropped on the Crisis Cloud with your live GPS location for DTL Street Liaisons.
+                3. If the alarm isn&apos;t disabled, an SOS pin is anonymously dropped on the Crisis Cloud with your live GPS location for DTL Street Liaisons.
               </p>
             </div>
 

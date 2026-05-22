@@ -56,7 +56,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [searchOpen, setSearchOpen] = useState(true);
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage', 'Nightlife']));
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage']));
   const [forYou, setForYou] = useState(false);
 
   // Helper: toggle a venue category in the active set

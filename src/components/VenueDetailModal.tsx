@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Venue, Promotion, Event } from '@/types';
 import SecureQR from '@/components/SecureQR';
-import { X, MapPin, Clock, Globe, Calendar, AlertTriangle, Tag, Ticket, ChevronRight } from 'lucide-react';
+import { X, MapPin, Clock, Globe, Calendar, AlertTriangle, Tag, Ticket } from 'lucide-react';
 import { sanitizeUrl } from '@/components/map/mapHelpers';
 
 interface ConstructionWarning {
@@ -59,6 +59,8 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
 
   // Reset tab when venue changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (venue) setActiveTab('details');
   }, [venue?.id]);
 

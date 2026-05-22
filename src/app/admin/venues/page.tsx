@@ -5,7 +5,7 @@ export default async function AdminVenuesPage() {
   const supabase = await createClient();
   
   // Fetch venues
-  const { data: venues, error } = await supabase
+  const { data: venues } = await supabase
     .from('venues')
     .select('*')
     .order('name');

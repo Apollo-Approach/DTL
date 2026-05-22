@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, ExternalLink, Music, MapPin, Ticket } from 'lucide-react';
+import { Calendar, ExternalLink, Music, MapPin } from 'lucide-react';
 
 interface CivicEvent {
   id: string;
@@ -104,6 +104,7 @@ export default function CivicEventsPanel() {
                 {/* Event Image or Icon */}
                 {event.imageUrl ? (
                   <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src={event.imageUrl} 
                       alt={event.name} 

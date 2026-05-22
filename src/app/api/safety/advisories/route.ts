@@ -21,7 +21,7 @@ export async function GET() {
     }));
 
     return NextResponse.json({ advisories });
-  } catch (error) {
+  } catch {
     // Graceful fallback if the municipal WAF blocks our local dev environment
     return NextResponse.json({ advisories: [
         { title: 'Traffic Advisory: Dundas Place closed to vehicles for weekend pedestrian activation.', date: new Date().toISOString() },

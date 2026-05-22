@@ -2,8 +2,6 @@ import Link from 'next/link';
 import MapWrapper from '@/components/MapWrapper';
 import { createClient } from '@/lib/supabase/server';
 import Script from 'next/script';
-import CommunityFeed from '@/components/CommunityFeed';
-import SecureQR from '@/components/SecureQR';
 import SafetyDashboard from '@/components/SafetyDashboard';
 import NearbyOfferings from '@/components/NearbyOfferings';
 import CivicEventsPanel from '@/components/CivicEventsPanel';
@@ -14,8 +12,8 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   const supabase = await createClient();
 
-  // Fetch live spatial data, social posts, AND active promotions concurrently
-  const [venuesResponse, incidentsResponse, socialResponse, promosResponse, eventsResponse, authResponse] = await Promise.all([
+  // Fetch live spatial data AND active promotions concurrently
+  const [venuesResponse, incidentsResponse, , promosResponse, eventsResponse, authResponse] = await Promise.all([
     supabase.from('venues_public').select('*'),
     supabase.from('safety_incidents_public').select('*').neq('status', 'RESOLVED'),
     supabase.from('social_posts').select('*').order('posted_at', { ascending: false }).limit(10),
@@ -26,7 +24,6 @@ export default async function Home() {
 
   const venues = venuesResponse.data || [];
   const incidents = incidentsResponse.data || [];
-  const socialPosts = socialResponse.data || [];
   const promos = promosResponse.data || [];
   const events = eventsResponse.data || [];
   const user = authResponse.data?.user;

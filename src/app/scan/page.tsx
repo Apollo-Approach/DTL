@@ -1,7 +1,7 @@
 // src/app/scan/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 
 export default function ScanPage() {
@@ -22,7 +22,7 @@ export default function ScanPage() {
       } else {
         setStatus({ type: 'error', message: result.error || 'Invalid QR Code' });
       }
-    } catch (err) {
+    } catch {
       setStatus({ type: 'error', message: 'Verification failed.' });
     }
 

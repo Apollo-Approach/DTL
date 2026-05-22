@@ -33,8 +33,12 @@ export default function ResolutionReportModal({ incident, onClose, onSuccess }: 
       } else {
         setError(res.error || 'Failed to submit report.');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setIsSubmitting(false);
     }

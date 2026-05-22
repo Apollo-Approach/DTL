@@ -27,15 +27,15 @@ export default function IncidentActionPanel({ incident, onClose, onUpdate, userR
     try {
       const res = await updateIncidentStatus(incident.id, newStatus);
       if (res.success) {
-        onUpdate({ ...incident, status: newStatus as any });
+        onUpdate({ ...incident, status: newStatus as SafetyIncident['status'] });
         if (newStatus === 'RESOLVED') {
           onClose();
         }
       } else {
         setError(res.error || 'Failed to update status');
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function IncidentActionPanel({ incident, onClose, onUpdate, userR
 
         {incident.description && (
           <div className="bg-neutral-900/50 rounded-xl p-3 border border-neutral-800/50">
-            <p className="text-sm text-neutral-300 italic">"{incident.description}"</p>
+            <p className="text-sm text-neutral-300 italic">&quot;{incident.description}&quot;</p>
           </div>
         )}
 
@@ -123,7 +123,7 @@ export default function IncidentActionPanel({ incident, onClose, onUpdate, userR
           onClose={() => setShowResolutionModal(false)}
           onSuccess={() => {
             setShowResolutionModal(false);
-            onUpdate({ ...incident, status: 'RESOLVED' as any, resolved_at: new Date().toISOString() });
+            onUpdate({ ...incident, status: 'RESOLVED' as SafetyIncident['status'], resolved_at: new Date().toISOString() });
             onClose();
           }}
         />

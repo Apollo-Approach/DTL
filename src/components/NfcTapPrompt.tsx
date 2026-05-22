@@ -26,6 +26,7 @@ export default function NfcTapPrompt({ className }: NfcTapPromptProps) {
 
   // Check NFC support after mount — avoids SSR/client hook mismatch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsSupported('NDEFReader' in window);
   }, []);
 

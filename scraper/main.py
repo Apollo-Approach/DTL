@@ -1,6 +1,8 @@
 import os
+import re
 import time
 import json
+import math
 import logging
 import requests
 from dotenv import load_dotenv
@@ -48,6 +50,131 @@ def get_grounding_lite_data(venue_name):
         logger = logging.getLogger("dtl-scraper")
         logger.error(f"Error calling Maps Grounding Lite for {venue_name}: {e}")
         return {}
+
+
+def _haversine_meters(lat1, lon1, lat2, lon2):
+    """Return the great-circle distance in meters between two lat/lng pairs."""
+    R = 6_371_000  # Earth radius in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
+    a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _extract_address_from_summary(summary_text):
+    """Pull a street address out of the Maps Grounding Lite summary.
+    Typical pattern: '...located at 349 Talbot St, London, ON...'
+    """
+    if not summary_text:
+        return None
+    match = re.search(
+        r'located at\s+([^.]+?,\s*London,\s*ON(?:\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d)?)',
+        summary_text,
+        re.IGNORECASE,
+    )
+    return match.group(1).strip().rstrip(',') if match else None
+
+
+def reconcile_venue_location(supabase_client, venue_id, venue_name, maps_data):
+    """Compare the venue's stored DB address/location against Maps Grounding
+    Lite data.  If the discrepancy is significant (>100 m) and the venue is
+    NOT manually curated, auto-correct the address and PostGIS location.
+
+    Every mismatch is appended to  data/location_mismatches.jsonl  for audit.
+    """
+    MISMATCH_THRESHOLD_M = 100  # metres
+
+    places = maps_data.get("places", [])
+    if not places:
+        return
+
+    maps_loc = places[0].get("location", {})
+    maps_lat = maps_loc.get("latitude")
+    maps_lng = maps_loc.get("longitude")
+    if maps_lat is None or maps_lng is None:
+        return
+
+    # Fetch the venue's current DB address and PostGIS coords
+    try:
+        row = (
+            supabase_client.table("venues")
+            .select("address, is_manually_curated, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng")
+            .eq("id", venue_id)
+            .single()
+            .execute()
+        )
+        venue_row = row.data
+    except Exception as e:
+        logger.warning(f"Could not fetch venue row for reconciliation ({venue_id}): {e}")
+        return
+
+    if not venue_row:
+        return
+
+    db_lat = venue_row.get("lat")
+    db_lng = venue_row.get("lng")
+    db_address = venue_row.get("address", "")
+    is_curated = venue_row.get("is_manually_curated", False)
+
+    if db_lat is None or db_lng is None:
+        # No location stored — always accept Maps data
+        distance_m = float('inf')
+    else:
+        distance_m = _haversine_meters(db_lat, db_lng, maps_lat, maps_lng)
+
+    # Extract address from the Maps summary
+    maps_address = _extract_address_from_summary(maps_data.get("summary", ""))
+
+    if distance_m <= MISMATCH_THRESHOLD_M:
+        logger.info(f"  ✓ Location OK for {venue_name} (Δ {distance_m:.0f} m)")
+        return
+
+    # ---- Mismatch detected ----
+    mismatch_record = {
+        "venue_id": venue_id,
+        "venue_name": venue_name,
+        "db_address": db_address,
+        "db_lat": db_lat,
+        "db_lng": db_lng,
+        "maps_address": maps_address,
+        "maps_lat": maps_lat,
+        "maps_lng": maps_lng,
+        "distance_m": round(distance_m, 1),
+        "is_manually_curated": is_curated,
+        "action": "skipped" if is_curated else "auto_corrected",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+    # Persist the mismatch for audit
+    os.makedirs("data", exist_ok=True)
+    with open("data/location_mismatches.jsonl", "a") as f:
+        f.write(json.dumps(mismatch_record) + "\n")
+
+    if is_curated:
+        logger.warning(
+            f"  ⚠ MISMATCH for {venue_name} (Δ {distance_m:.0f} m) — "
+            f"DB: {db_address} | Maps: {maps_address}  "
+            f"[SKIPPED: is_manually_curated=true]"
+        )
+        return
+
+    # Auto-correct
+    update_payload = {
+        "location": f"SRID=4326;POINT({maps_lng} {maps_lat})",
+    }
+    if maps_address:
+        update_payload["address"] = maps_address
+
+    try:
+        supabase_client.table("venues").update(update_payload).eq("id", venue_id).execute()
+        logger.warning(
+            f"  🔧 AUTO-CORRECTED {venue_name} (Δ {distance_m:.0f} m) — "
+            f"\"{db_address}\" → \"{maps_address or '(coords only)'}\"  "
+            f"({db_lat},{db_lng}) → ({maps_lat},{maps_lng})"
+        )
+    except Exception as e:
+        logger.error(f"  ✗ Failed to auto-correct location for {venue_name}: {e}")
 
 # Configure robust logging to both file and stdout
 os.makedirs('data', exist_ok=True)
@@ -130,6 +257,9 @@ def process_venues():
                         if maps_data:
                             logger.info(f"Received Maps data for {venue_name}. Injecting into offerings...")
                             offerings_json["maps_grounding_lite"] = maps_data
+                            
+                            # Reconcile: compare Maps location against DB and auto-correct if wrong
+                            reconcile_venue_location(supabase, venue_id, venue_name, maps_data)
                         
                         logger.info(f"Updating Supabase for {venue_name}...")
                         supabase.table("venues").update({"offerings": offerings_json}).eq("id", venue_id).execute()

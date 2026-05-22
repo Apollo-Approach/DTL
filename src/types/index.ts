@@ -138,11 +138,8 @@ export interface Habits {
 }
 
 export interface Offerings {
-  menu_highlights?: string[];
-  pricing_intel?: string;
-  upcoming_events?: string[];
   vibe_analysis?: string;
-  maps_grounding_lite?: any;
+  maps_grounding_lite?: Record<string, unknown>;
 }
 
 export interface Preferences {

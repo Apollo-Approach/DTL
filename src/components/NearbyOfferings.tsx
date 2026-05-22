@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import SecureQR from '@/components/SecureQR';
 import VenueDetailModal from '@/components/VenueDetailModal';
 
 import { Venue, Promotion, Event, Preferences } from '@/types';
@@ -50,15 +49,15 @@ interface FeedItem {
   distance_km: number | null;
 }
 
+// Default center: Richmond & Dundas intersection
+const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
+
 export default function NearbyOfferings({ venues, promos, events = [], preferences }: NearbyOfferingsProps) {
   const [forYou, setForYou] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [activeSituationTag, setActiveSituationTag] = useState<string | null>(null);
   const [liveFeed, setLiveFeed] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
-
-  // Default center: Richmond & Dundas intersection
-  const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
 
   // Fetch live promo feed when situation tag changes
   useEffect(() => {

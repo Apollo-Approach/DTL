@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { Preferences } from '@/types';
 
 export async function savePreferences(preferencesData: Preferences) {

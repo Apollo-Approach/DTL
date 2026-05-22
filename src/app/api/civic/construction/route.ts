@@ -29,9 +29,7 @@ interface ConstructionProject {
 const ARCGIS_ROAD_CLOSURES_URL = 
   'https://services1.arcgis.com/bqfNVPUK3HOnCFmA/arcgis/rest/services/RoadClosures_public/FeatureServer/0/query';
 
-// Renew London page for scraping structured project data
-const RENEW_LONDON_URL = 
-  'https://london.ca/living-london/roads-sidewalks-transportation/road-construction';
+
 
 async function fetchArcGISClosures(): Promise<ConstructionProject[]> {
   try {

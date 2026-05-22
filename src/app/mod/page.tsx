@@ -10,7 +10,6 @@ import MapWrapper from '@/components/MapWrapper';
 // M-Tier hierarchy for access control
 const M_TIER_ROLES = ['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'];
 const CAN_DISPATCH = ['m2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'];
-const CAN_VIEW_ALL_RESPONDERS = ['m3_admin', 'm4_police', 'm5_sysadmin'];
 const CAN_AUTO_DISPATCH = ['m3_admin', 'm4_police', 'm5_sysadmin'];
 
 function getRoleBadge(role: string) {
@@ -61,6 +60,7 @@ export default function SafetyModDashboard() {
 
   // Incident data
   const [incidents, setIncidents] = useState<SafetyIncident[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [venues, setVenues] = useState<any[]>([]);
   const [selectedTab, setSelectedTab] = useState<'active' | 'resolved'>('active');
 
@@ -127,15 +127,16 @@ export default function SafetyModDashboard() {
 
     const allIncidents = incRes.data || [];
     setStats({
-      active: allIncidents.filter((i: any) => i.status === 'REPORTED').length,
-      dispatched: allIncidents.filter((i: any) => i.status === 'DISPATCHED').length,
-      resolved: allIncidents.filter((i: any) => i.status === 'RESOLVED').length,
+      active: allIncidents.filter((i: SafetyIncident) => i.status === 'REPORTED').length,
+      dispatched: allIncidents.filter((i: SafetyIncident) => i.status === 'DISPATCHED').length,
+      resolved: allIncidents.filter((i: SafetyIncident) => i.status === 'RESOLVED').length,
       onDutyCount: shiftRes.data?.length || 0,
     });
   }, [supabase]);
 
   useEffect(() => {
     if (!authorized) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [authorized, fetchData]);
 

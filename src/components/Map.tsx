@@ -5,13 +5,11 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Event } from '@/types';
 interface MapProps {
-  initialCenter?: [number, number];
   initialZoom?: number;
   events?: Event[];
 }
 
 export default function Map({ 
-  initialCenter = [-81.250, 42.983],
   initialZoom = 15,
   events = [] 
 }: MapProps) {

@@ -150,22 +150,25 @@ export const escapeHtml = (unsafe: string | null | undefined): string => {
  * Used for filtering, marker coloring, and 3D building matching.
  */
 export const VENUE_CATEGORIES = {
-  Nightlife: ['club', 'bar', 'nightclub', 'lounge', 'night_club', 'pub', 'brewery'],
+  Nightlife: ['club', 'nightclub', 'lounge', 'night_club'],
+  Bars: ['bar', 'pub', 'brewery'],
   Eatery: ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery'],
   Stage: ['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'],
 } as const;
 
 export const CATEGORY_COLORS: Record<string, string> = {
   Nightlife: '#d946ef',
+  Bars: '#06b6d4',
   Eatery: '#f97316',
   Stage: '#eab308',
   Retail: '#64748b',
 };
 
 /** Resolves a venue type string to its display category. */
-export function getVenueCategory(type: string | null | undefined): 'Nightlife' | 'Eatery' | 'Stage' | 'Retail' {
+export function getVenueCategory(type: string | null | undefined): 'Nightlife' | 'Bars' | 'Eatery' | 'Stage' | 'Retail' {
   const vType = type || '';
   if ((VENUE_CATEGORIES.Nightlife as readonly string[]).includes(vType)) return 'Nightlife';
+  if ((VENUE_CATEGORIES.Bars as readonly string[]).includes(vType)) return 'Bars';
   if ((VENUE_CATEGORIES.Eatery as readonly string[]).includes(vType)) return 'Eatery';
   if ((VENUE_CATEGORIES.Stage as readonly string[]).includes(vType)) return 'Stage';
   return 'Retail';

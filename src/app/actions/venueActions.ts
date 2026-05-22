@@ -50,7 +50,7 @@ export async function redeemPass(passCode: string) {
   // NOTE: In JS, nested joins like promotions!inner return as an object or array.
   // We need to type-cast or access it correctly. 
   // Let's assume pass.promotions is an object with venue_id
-  const promoVenueId = Array.isArray(pass.promotions) ? pass.promotions[0]?.venue_id : (pass.promotions as any)?.venue_id;
+  const promoVenueId = Array.isArray(pass.promotions) ? pass.promotions[0]?.venue_id : (pass.promotions as Record<string, unknown>)?.venue_id;
 
   if (promoVenueId !== venueId) {
     return { success: false, error: 'This pass is for a different venue.' };

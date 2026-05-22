@@ -23,7 +23,7 @@ export default function VenueScanPage() {
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to redeem pass.' });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'An unexpected error occurred.' });
     } finally {
       setLoading(false);
@@ -41,7 +41,7 @@ export default function VenueScanPage() {
         
         <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Scan Pass</h2>
         <p className="text-gray-400 text-sm text-center mb-8">
-          Enter the user's Pass Code manually to redeem their promotion.
+          Enter the user&apos;s Pass Code manually to redeem their promotion.
         </p>
 
         <form onSubmit={handleScan} className="w-full space-y-4">

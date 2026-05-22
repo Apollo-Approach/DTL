@@ -13,7 +13,7 @@ interface SafeWalkOverlayProps {
 }
 
 export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWalkOverlayProps) {
-  const [timeLeft, setTimeLeft] = useState(expiresAt - Date.now());
+  const [timeLeft, setTimeLeft] = useState(() => expiresAt - Date.now());
   const [isWarning, setIsWarning] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
   const [dispatched, setDispatched] = useState(false);
@@ -44,50 +44,7 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
     };
   }, []);
 
-  useEffect(() => {
-    if (dispatched) return;
-
-    const interval = setInterval(() => {
-      const remaining = expiresAt - Date.now();
-      setTimeLeft(remaining);
-
-      // Warning Phase (<= 30 seconds)
-      if (remaining <= 30000 && remaining > 0) {
-        if (!isWarning) {
-            setIsWarning(true);
-            if (Capacitor.isNativePlatform()) {
-              NativeAudio.loop({ assetId: 'safewalk_alarm' }).catch(e => console.error(e));
-            } else {
-              if (audioRef.current && audioRef.current.paused) {
-                audioRef.current.play().catch(e => console.error('Audio play blocked:', e));
-              }
-            }
-        }
-      } else {
-        if (isWarning) {
-            setIsWarning(false);
-            if (Capacitor.isNativePlatform()) {
-              NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
-            } else {
-              if (audioRef.current && !audioRef.current.paused) {
-                audioRef.current.pause();
-              }
-            }
-        }
-      }
-
-      // Dispatch Phase (<= 0 seconds)
-      if (remaining <= 0 && !isDispatching && !dispatched) {
-        setIsDispatching(true);
-        clearInterval(interval);
-        dispatchSOS();
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [expiresAt, dispatched, isDispatching]);
-
-  const dispatchSOS = async () => {
+  const dispatchSOS = React.useCallback(async () => {
     if (Capacitor.isNativePlatform()) {
       NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
     } else if (audioRef.current) {
@@ -133,7 +90,51 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
       console.error("SOS Dispatch error:", e);
       setDispatched(true);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (dispatched) return;
+
+    const interval = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      setTimeLeft(remaining);
+
+      // Warning Phase (<= 30 seconds)
+      if (remaining <= 30000 && remaining > 0) {
+        if (!isWarning) {
+            setIsWarning(true);
+            if (Capacitor.isNativePlatform()) {
+              NativeAudio.loop({ assetId: 'safewalk_alarm' }).catch(e => console.error(e));
+            } else {
+              if (audioRef.current && audioRef.current.paused) {
+                audioRef.current.play().catch(e => console.error('Audio play blocked:', e));
+              }
+            }
+        }
+      } else {
+        if (isWarning) {
+            setIsWarning(false);
+            if (Capacitor.isNativePlatform()) {
+              NativeAudio.stop({ assetId: 'safewalk_alarm' }).catch(() => {});
+            } else {
+              if (audioRef.current && !audioRef.current.paused) {
+                audioRef.current.pause();
+              }
+            }
+        }
+      }
+
+      // Dispatch Phase (<= 0 seconds)
+      if (remaining <= 0 && !isDispatching && !dispatched) {
+        setIsDispatching(true);
+        clearInterval(interval);
+        dispatchSOS();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt, dispatched, isDispatching, isWarning, supabase, dispatchSOS]);
+
 
   if (dispatched) {
     return (
@@ -202,7 +203,7 @@ export default function SafeWalkOverlay({ expiresAt, onSafe, onExtend }: SafeWal
           }}
           className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-full shadow-xl shadow-emerald-900/50 transition-transform active:scale-95"
         >
-          I'm Safe
+          I&apos;m Safe
         </button>
       </div>
     </>

@@ -1,9 +1,18 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 
+interface ConstructionProject {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  source: string;
+  impacts: string[];
+}
+
 export function useConstructionMarkers(
   mapRef: React.RefObject<maplibregl.Map | null>,
-  constructionProjects: any[],
+  constructionProjects: ConstructionProject[],
   layerToggles: { construction: boolean }
 ) {
   const markersRef = useRef<maplibregl.Marker[]>([]);

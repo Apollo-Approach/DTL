@@ -52,14 +52,14 @@ export default async function SearchPage({
   if (situation) {
     venuesQuery = venuesQuery.contains('situation_tags', [situation]);
   }
-  const { data: venues, error: vError } = await venuesQuery.order('name');
+  const { data: venues } = await venuesQuery.order('name');
 
   // Fetch Events
   let eventsQuery = supabase.from('events_public').select('*');
   if (query) {
     eventsQuery = eventsQuery.ilike('name', `%${query}%`);
   }
-  const { data: events, error: eError } = await eventsQuery.order('start_time', { ascending: true });
+  const { data: events } = await eventsQuery.order('start_time', { ascending: true });
 
   // Fetch matching promotions if situation tag active
   let matchingPromos: Array<{ id: string; title: string; discount_value: string; venue_id: string; situation_tags: string[]; recurring_day: string }> = [];

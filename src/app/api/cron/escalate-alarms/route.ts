@@ -60,8 +60,8 @@ export async function GET(request: Request) {
       notifiedSysadmins: m5Admins?.length || 0
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Cron job error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
   }
 }

@@ -14,7 +14,7 @@ export default function TermsOfService() {
         <section className="space-y-4">
           <h2 className="text-2xl font-bold text-cyan-400">1. Acceptance of Terms</h2>
           <p className="text-zinc-400 leading-relaxed">
-            By accessing or using the DTL Nightly platform ("Service"), you agree to be bound by these Terms of Service. If you do not agree to all the terms and conditions of this agreement, you may not access the website or use any services.
+            By accessing or using the DTL Nightly platform (&quot;Service&quot;), you agree to be bound by these Terms of Service. If you do not agree to all the terms and conditions of this agreement, you may not access the website or use any services.
           </p>
         </section>
 

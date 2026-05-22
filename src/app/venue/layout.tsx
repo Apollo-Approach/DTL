@@ -13,7 +13,7 @@ export default async function VenueLayout({
     redirect('/login?next=/venue');
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('role, venue_id')
     .eq('id', user.id)

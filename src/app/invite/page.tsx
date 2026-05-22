@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, Unlock, ArrowRight, Sparkles } from 'lucide-react';
 import { setInviteCookie } from '@/app/actions/invite';
@@ -96,7 +96,7 @@ export default function InviteWizard() {
                 Welcome to the Core
               </h1>
               <p className="text-zinc-400 text-sm font-medium leading-relaxed max-w-sm mx-auto">
-                You've been invited to shape the nightlife of the city. As an early pioneer, your feedback will define the future of DTL Nightly.
+                You&apos;ve been invited to shape the nightlife of the city. As an early pioneer, your feedback will define the future of DTL Nightly.
               </p>
             </div>
 

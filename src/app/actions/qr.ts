@@ -45,7 +45,7 @@ export async function verifySignedQrPayload(qrPayloadString: string) {
     }
     
     return { success: true, data: parsed.data };
-  } catch (err) {
+  } catch {
     return { success: false, error: 'Malformed QR code' };
   }
 }

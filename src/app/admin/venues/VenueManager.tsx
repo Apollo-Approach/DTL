@@ -4,9 +4,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Camera, Edit2, MapPin, Plus, Save, Search, X } from 'lucide-react';
+import { Camera, Edit2, Plus, Save, Search, X } from 'lucide-react';
 
-type Venue = any;
+export interface Venue {
+  id?: string;
+  name?: string;
+  description?: string;
+  type?: string;
+  lat?: number;
+  lng?: number;
+  image_url?: string;
+  is_manually_curated?: boolean;
+}
 
 export default function VenueManager({ initialVenues }: { initialVenues: Venue[] }) {
   const [venues, setVenues] = useState<Venue[]>(initialVenues);
@@ -113,9 +122,9 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
       }
       
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert('Failed to save venue: ' + err.message);
+      alert('Failed to save venue: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
     }
@@ -150,6 +159,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         markerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen]); // Only re-run if modal opens/closes
 
   // Update marker position if editingVenue lat/lng changes
@@ -197,6 +207,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
               <tr key={v.id} className="hover:bg-neutral-800/50 transition-colors">
                 <td className="px-6 py-4">
                   {v.image_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={v.image_url} alt={v.name} className="w-12 h-12 object-cover rounded-lg border border-neutral-700" />
                   ) : (
                     <div className="w-12 h-12 bg-neutral-800 rounded-lg border border-neutral-700 flex items-center justify-center text-neutral-500">
@@ -286,7 +297,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                     />
                     <label htmlFor="manual_override" className="text-sm">
                       <span className="font-bold text-indigo-300 block">Manual Override Protected</span>
-                      <span className="text-xs text-neutral-400">If checked, the automated scraper will not overwrite this venue's details.</span>
+                      <span className="text-xs text-neutral-400">If checked, the automated scraper will not overwrite this venue&apos;s details.</span>
                     </label>
                   </div>
                 </div>
@@ -297,6 +308,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                     <div className="flex flex-col gap-3">
                       {editingVenue.image_url ? (
                         <div className="relative group">
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img src={editingVenue.image_url} alt="Venue" className="w-full h-40 object-cover rounded-lg border border-neutral-800" />
                           <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer rounded-lg backdrop-blur-sm">
                             <span className="text-sm font-bold text-white flex items-center gap-2">
