@@ -11,6 +11,7 @@ import { Shield, AlertTriangle, MapPin, Phone } from 'lucide-react';
 function AdvisoryFeed() {
   const [advisories, setAdvisories] = useState<{title: string; type?: string}[]>([]);
   const [duration, setDuration] = useState(90);
+  const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,8 +42,6 @@ function AdvisoryFeed() {
   useEffect(() => {
     if (containerRef.current) {
       const width = containerRef.current.scrollWidth;
-      // We want a readable constant speed of 60 pixels per second.
-      // Since it scrolls from translateX(100vw) to translateX(-100%), the travel distance is approx window width + scroll width.
       const distance = window.innerWidth + width;
       const calculatedDuration = distance / 60;
       setDuration(Math.max(calculatedDuration, 30));
@@ -52,39 +51,68 @@ function AdvisoryFeed() {
   if (advisories.length === 0) return null;
 
   return (
-    <div className="w-full bg-amber-950/20 border border-amber-900/30 rounded-xl overflow-hidden relative">
-      <div className="flex items-center">
-        <div className="flex-shrink-0 font-bold text-[10px] uppercase tracking-widest px-4 py-2 flex items-center gap-2 border-r border-amber-900/30 bg-amber-950/30 text-amber-400/80 z-20">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-          </span>
-          Live
-        </div>
-        <div className="flex-1 overflow-hidden relative flex items-center py-2">
-          <div
-            ref={containerRef}
-            className="whitespace-nowrap animate-[marquee_linear_infinite] text-xs font-medium text-neutral-300"
-            style={{ animationDuration: `${duration}s` }}
-          >
-            {advisories.map((adv, idx) => (
-              <span key={idx} className={`mx-8 ${
-                adv.type === 'construction' ? 'text-orange-300' : 
-                adv.type === 'transit' ? 'text-sky-300' : ''
-              }`}>
-                {adv.title}
-              </span>
-            ))}
+    <>
+      <div 
+        onClick={() => setIsOpen(true)}
+        className="w-full bg-amber-950/20 border border-amber-900/30 rounded-xl overflow-hidden relative cursor-pointer hover:bg-amber-900/30 transition-colors"
+      >
+        <div className="flex items-center">
+          <div className="flex-shrink-0 font-bold text-[10px] uppercase tracking-widest px-4 py-2 flex items-center gap-2 border-r border-amber-900/30 bg-amber-950/30 text-amber-400/80 z-20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            Live
+          </div>
+          <div className="flex-1 overflow-hidden relative flex items-center py-2">
+            <div
+              ref={containerRef}
+              className="whitespace-nowrap animate-[marquee_linear_infinite] text-xs font-medium text-neutral-300"
+              style={{ animationDuration: `${duration}s` }}
+            >
+              {advisories.map((adv, idx) => (
+                <span key={idx} className={`mx-8 ${
+                  adv.type === 'construction' ? 'text-orange-300' : 
+                  adv.type === 'transit' ? 'text-sky-300' : ''
+                }`}>
+                  {adv.title}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes marquee {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+          }
+        `}} />
       </div>
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes marquee {
-          0% { transform: translateX(100vw); }
-          100% { transform: translateX(-100%); }
-        }
-      `}} />
-    </div>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-amber-900/50 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="px-6 py-4 border-b border-amber-900/20 flex justify-between items-center bg-neutral-800/50">
+              <h2 className="text-lg font-bold text-amber-500">Live Advisories</h2>
+              <button onClick={() => setIsOpen(false)} className="text-neutral-400 hover:text-white text-sm font-bold px-3 py-1 bg-neutral-800 rounded-lg">Close</button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              {advisories.map((adv, idx) => (
+                <div key={idx} className="bg-neutral-800/50 border border-neutral-700/50 rounded-xl p-4">
+                  <span className={`text-[10px] font-black tracking-widest uppercase ${
+                    adv.type === 'construction' ? 'text-orange-500' : 
+                    adv.type === 'transit' ? 'text-sky-500' : 'text-amber-500'
+                  }`}>
+                    {adv.type || 'SAFETY'}
+                  </span>
+                  <p className="mt-2 text-sm text-neutral-200 leading-relaxed">{adv.title}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

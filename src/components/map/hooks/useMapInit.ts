@@ -214,15 +214,18 @@ export function useMapInit({
             paint: {
               'fill-extrusion-color': [
                 'case',
-                ['==', ['get', 'isDelayed'], true], '#888888',         // Grey if delayed/stale
-                ['==', ['get', 'hasOccupancyData'], false], '#3b82f6', // Blue — No occupancy data reported
-                ['>=', ['get', 'occupancyStatus'], 5], '#dc2626',      // Red — Full / Not Accepting
-                ['>=', ['get', 'occupancyStatus'], 3], '#ef4444',      // Red — Standing Room
-                ['==', ['get', 'occupancyStatus'], 2], '#eab308',      // Yellow — Few Seats
-                ['==', ['get', 'occupancyStatus'], 1], '#22c55e',      // Green — Many Seats
-                ['==', ['get', 'occupancyStatus'], 0], '#10b981',      // Teal — Genuinely Empty (has data)
-                '#3b82f6' // Blue — fallback
-              ], 
+                ['==', ['get', 'isDelayed'], true], '#888888',
+                ['==', ['get', 'hasOccupancyData'], false], '#3b82f6',
+                ['>=', ['get', 'occupancyPercentage'], 0], [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'occupancyPercentage'],
+                  0, '#22c55e',   // Green
+                  50, '#eab308',  // Yellow
+                  100, '#dc2626'  // Red
+                ],
+                '#3b82f6'
+              ],
               'fill-extrusion-height': 5.4,      // Height increased by 20% (from 4.5 to 5.4)
               'fill-extrusion-base': 0,
               'fill-extrusion-opacity': 0.95

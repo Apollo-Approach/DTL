@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 
 const DISPATCH_RADIUS_METERS = 450;
 
@@ -196,10 +197,17 @@ export async function autoDispatch(incidentId: string, incidentLat: number, inci
   };
 }
 
+
 /**
  * Start a responder shift (go on-duty).
  */
 export async function startShift(userId: string, zone: string = 'downtown') {
+  const authClient = await createServerClient();
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user || user.id !== userId) {
+    return { success: false, error: 'Unauthorized: ID mismatch or not logged in.' };
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -234,6 +242,12 @@ export async function startShift(userId: string, zone: string = 'downtown') {
  * End a responder shift (go off-duty).
  */
 export async function endShift(userId: string) {
+  const authClient = await createServerClient();
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user || user.id !== userId) {
+    return { success: false, error: 'Unauthorized: ID mismatch or not logged in.' };
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

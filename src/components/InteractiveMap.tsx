@@ -53,9 +53,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [localIncidentUpdates, setLocalIncidentUpdates] = useState<Record<string, SafetyIncident>>({});
 
   // Map Decluttering Filter State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [searchOpen, setSearchOpen] = useState(true);
+
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage']));
   const [forYou, setForYou] = useState(false);
 
@@ -180,8 +178,8 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     setPinDescription
   });
 
-  useVenueMarkers(mapRef, venues, promos, events, searchQuery, forYou, preferences, activeCategories, false);
-  useEventMarkers(mapRef, events, searchQuery, dateFilter, layerToggles, preferences);
+  useVenueMarkers(mapRef, venues, promos, events, '', forYou, preferences, activeCategories, false);
+  useEventMarkers(mapRef, events, '', '', layerToggles, preferences);
   useIncidentMarkers(mapRef, incidents, localIncidentUpdates, layerToggles, userRole, timeFilter, mode, setSelectedIncident);
   useConstructionMarkers(mapRef, constructionProjects, layerToggles);
 
@@ -357,10 +355,6 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         setForYou={setForYou}
         preferences={preferences}
         mode={mode}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        dateFilter={dateFilter}
-        setDateFilter={setDateFilter}
         userRole={userRole}
       />
 

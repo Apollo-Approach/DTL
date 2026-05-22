@@ -23,10 +23,6 @@ interface MapFilterBarProps {
   setForYou: React.Dispatch<React.SetStateAction<boolean>>;
   preferences: Preferences | null;
   mode: 'public' | 'crisis';
-  searchQuery: string;
-  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
-  dateFilter: string;
-  setDateFilter: React.Dispatch<React.SetStateAction<string>>;
   userRole?: string;
 }
 
@@ -35,8 +31,6 @@ export default function MapFilterBar({
   activeCategories, toggleCategory,
   forYou, setForYou,
   preferences, mode,
-  searchQuery, setSearchQuery,
-  dateFilter, setDateFilter,
   userRole = 'citizen',
 }: MapFilterBarProps) {
 

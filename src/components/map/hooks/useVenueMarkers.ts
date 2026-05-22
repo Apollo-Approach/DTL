@@ -55,38 +55,39 @@ export function useVenueMarkers(
       if (isPopUp) markerColor = '#06b6d4';
 
       const hasActiveSpecials = promos.some(p => p.venue_id === venue.id);
+      const todayEvent = (events || []).find(e => e.venue_id === venue.id && new Date(e.start_time).toDateString() === new Date().toDateString());
+      const hasEvent = !!todayEvent;
+      const isHQ = venue.name.toLowerCase().includes('dtl') && venue.address.includes('430 Dundas');
 
       el.className = 'group relative flex items-center justify-center cursor-pointer';
       el.id = `venue-marker-${venue.id}`;
       el.style.width = '28px';
       el.style.height = '28px';
 
-      // Category-based emoji icon
-      const category = getVenueCategory(venue.type);
-      const categoryEmoji: Record<string, string> = {
-        Eatery: '🍴', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️',
-      };
-      const emoji = categoryEmoji[category] || '📍';
-
-      el.innerHTML = `
-        <div style="width:28px;height:28px;border-radius:50%;background:${markerColor};border:2px solid rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px ${markerColor}88;transition:transform 0.2s;">
-          ${emoji}
-        </div>`;
-
-      if (isPopUp) {
-        el.innerHTML += '<span class="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>';
+      if (isHQ) {
+        el.innerHTML = `<div style="color: #22c55e; font-weight: 900; font-size: 20px; text-shadow: 0 0 10px #22c55e; font-family: monospace;">HQ</div>`;
+      } else if (hasEvent || hasActiveSpecials) {
+        el.innerHTML = `<div class="animate-bounce" style="color: #22c55e; font-weight: 900; font-size: 24px; text-shadow: 0 0 10px #22c55e;">${hasEvent ? '🎟️' : '$'}</div>`;
+      } else {
+        // Invisible marker to anchor the popup for building clicks
+        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
       }
+
+      const hqLinks = isHQ ? `<div style="margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px;"><a href="/about" style="display:block; margin-bottom: 4px; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">ℹ️ About & FAQ</a><a href="/contact" style="display:block; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">📞 Contact Us</a></div>` : '';
+      const eventLink = todayEvent ? `<div style="margin-top: 8px;"><a href="/events/${todayEvent.id}" style="display:block; padding: 6px; background-color: #22c55e; color: white; text-align: center; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px;">🎉 See Tonight's Event</a></div>` : '';
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([venue.lng, venue.lat])
         .setPopup(
           new maplibregl.Popup({ offset: 25, closeButton: true, closeOnClick: true, className: 'venue-popup' }).setHTML(
             `<div style="color: #000; font-family: sans-serif; padding: 8px; min-width: 180px;">
-              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: ${markerColor};">${escapeHtml(venue.name)}</h3>
+              <h3 style="margin: 0; font-weight: bold; font-size: 15px; color: ${isHQ ? '#22c55e' : markerColor};">${escapeHtml(venue.name)}</h3>
               <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${escapeHtml(venue.address)}</p>
               ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' && venue.operating_hours !== null ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${escapeHtml(day)}: ${escapeHtml(String(hrs))}`).join(' · ') : escapeHtml(String(venue.operating_hours))}</p>` : ''}
               ${sanitizeUrl(venue.website_url) ? `<a href="${sanitizeUrl(venue.website_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
               ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
+              ${eventLink}
+              ${hqLinks}
             </div>`
           )
         )
