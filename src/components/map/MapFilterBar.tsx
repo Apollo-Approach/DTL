@@ -2,7 +2,6 @@
 'use client';
 
 import React from 'react';
-import { Search, Calendar } from 'lucide-react';
 import { Preferences } from '@/types';
 
 interface LayerToggles {
@@ -18,8 +17,8 @@ interface LayerToggles {
 interface MapFilterBarProps {
   layerToggles: LayerToggles;
   setLayerToggles: React.Dispatch<React.SetStateAction<LayerToggles>>;
-  activeFilter: string | null;
-  setActiveFilter: React.Dispatch<React.SetStateAction<string | null>>;
+  activeCategories: Set<string>;
+  toggleCategory: (cat: string) => void;
   forYou: boolean;
   setForYou: React.Dispatch<React.SetStateAction<boolean>>;
   preferences: Preferences | null;
@@ -33,30 +32,13 @@ interface MapFilterBarProps {
 
 export default function MapFilterBar({
   layerToggles, setLayerToggles,
-  activeFilter, setActiveFilter,
+  activeCategories, toggleCategory,
   forYou, setForYou,
   preferences, mode,
   searchQuery, setSearchQuery,
   dateFilter, setDateFilter,
   userRole = 'citizen',
 }: MapFilterBarProps) {
-
-  /**
-   * Toggle a category filter. Acts as a radio button group:
-   * - If already active → deselect (hide retail layer)
-   * - If different or off → select (show retail layer, apply category filter)
-   */
-  const toggleCategory = (category: string) => {
-    if (activeFilter === category) {
-      // Deselect — hide retail buildings
-      setActiveFilter(null);
-      setLayerToggles(prev => ({ ...prev, retail: false }));
-    } else {
-      // Select — show retail buildings filtered to this category
-      setActiveFilter(category);
-      setLayerToggles(prev => ({ ...prev, retail: true }));
-    }
-  };
 
   return (
     <>
@@ -76,37 +58,37 @@ export default function MapFilterBar({
 
           {mode === 'public' && (
             <>
-              {/* Bars Bubble */}
+              {/* Bars Bubble (multi-select) */}
               <button 
-                onClick={() => toggleCategory('Nightlife')} 
+                onClick={() => toggleCategory('Bars')} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Nightlife' ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Bars') ? 'bg-fuchsia-900/50 border-[3px] border-fuchsia-400 shadow-[0_0_15px_rgba(232,121,249,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
                   🪩
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Nightlife' ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Bars</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Bars') ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Bars</span>
               </button>
 
-              {/* Eats Bubble */}
+              {/* Eats Bubble (multi-select) */}
               <button 
                 onClick={() => toggleCategory('Eatery')} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Eatery' ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Eatery') ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
                   🍔
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Eatery' ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Eatery') ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
               </button>
 
-              {/* Stages Bubble */}
+              {/* Stages Bubble (multi-select) */}
               <button 
                 onClick={() => toggleCategory('Stage')} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeFilter === 'Stage' ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Stage') ? 'bg-yellow-900/50 border-[3px] border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
                   🎭
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilter === 'Stage' ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Stage') ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
               </button>
 
               {/* Events Sub-Filter Bubble — filters selected venue type to only those with events */}

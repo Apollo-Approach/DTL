@@ -1,18 +1,26 @@
 // src/components/map/buildingExtrusions.ts
 // 3D Building Extrusion Engine — "The Nuclear Option"
 // Replaces pin markers with glowing, color-coded 3D building extrusions
-// using MapLibre Feature State API for high-performance per-building styling.
+// using a custom GeoJSON source to prevent tile-based ID collisions.
 
 import maplibregl from 'maplibre-gl';
 
 // --- Venue color palette matching BIA retail categories ---
 const VENUE_COLORS: Record<string, string> = {
   Nightlife: '#d946ef', // Fuchsia
+  Bars:      '#06b6d4', // Cyan
   Eatery:    '#f97316', // Orange
   Stage:     '#eab308', // Yellow
   Retail:    '#64748b', // Slate
   default:   '#1a1a2e', // Dormant dark
 };
+
+// Feature Flag for venue-based building color styling
+export let ENABLE_VENUE_COLORING = true;
+
+export function setEnableVenueColoring(enable: boolean) {
+  ENABLE_VENUE_COLORING = enable;
+}
 
 // Shimmer peak color (bright white-ish glow)
 const SHIMMER_PEAK = '#ffffff';
@@ -30,13 +38,15 @@ interface BuildingExtrusionState {
   matchedBuildings: Map<number, VenueMatch>;
   shimmerBuildings: Set<number>;
   animationFrameId: number | null;
+  nextFeatureId: number;
 }
 
 // Module state
-let state: BuildingExtrusionState = {
+const state: BuildingExtrusionState = {
   matchedBuildings: new Map(),
   shimmerBuildings: new Set(),
   animationFrameId: null,
+  nextFeatureId: 1,
 };
 
 // --- Color Interpolation Utility ---
@@ -75,62 +85,62 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
   // --- Step A: Suppress default POI labels for a pin-free experience ---
   suppressPOILabels(map);
 
-  // --- Step B: Dim existing flat building layers ---
-  // The dataviz-dark style has "Building" and "Building top" as flat fills.
-  // We dim them to ~30% so the city retains subtle building outlines
-  // while our venue-matched 3D extrusions stand out prominently.
-  const flatBuildingLayers = ['Building', 'Building top'];
-  flatBuildingLayers.forEach(layerId => {
-    if (map.getLayer(layerId)) {
-      try {
-        map.setPaintProperty(layerId, 'fill-opacity', 0.3);
-      } catch {
-        // Some styles may not support fill-opacity on this layer type
-        map.setLayoutProperty(layerId, 'visibility', 'none');
+  // --- Step B: Hide ALL existing building layers (flat fills AND 3D extrusions) to prevent z-fighting ---
+  const style = map.getStyle();
+  if (style?.layers) {
+    style.layers.forEach(layer => {
+      const sourceLayer = ('source-layer' in layer ? layer['source-layer'] : '') as string;
+      if (sourceLayer === 'building' && (layer as any).source === 'maptiler_planet') {
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
       }
-    }
-  });
+    });
+  }
 
-  // --- Step C: Add the 3D fill-extrusion layer ---
-  // IMPORTANT: Only matched venue buildings are rendered.
-  // We use a feature-state filter so unmatched buildings never paint.
-  // NOTE: MapLibre does NOT support data expressions for fill-extrusion-opacity,
-  // so we cannot use feature-state to drive opacity. Instead we start with the
-  // layer hidden and programmatically update it after matching.
+  // --- Step C: Add a queryable but invisible hitbox layer for all buildings ---
+  if (!map.getLayer('building-hitbox')) {
+    map.addLayer({
+      id: 'building-hitbox',
+      type: 'fill',
+      source: 'maptiler_planet',
+      'source-layer': 'building',
+      paint: {
+        'fill-opacity': 0 // Invisible but queryable
+      }
+    });
+  }
+
+  // --- Step D: Add custom GeoJSON source for matched buildings ONLY ---
+  if (!map.getSource('venue-buildings-source')) {
+    map.addSource('venue-buildings-source', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+  }
+
   if (!map.getLayer('osm-3d-buildings')) {
     map.addLayer({
       id: 'osm-3d-buildings',
       type: 'fill-extrusion',
-      source: 'maptiler_planet',
-      'source-layer': 'building',
+      source: 'venue-buildings-source',
       minzoom: 14.5,
       paint: {
-        // Color: driven by feature-state — only matched venues get color
-        // Unmatched buildings get transparent black, invisible against the dark basemap
+        // Color: driven by feature-state (for shimmer) or property fallback
         'fill-extrusion-color': [
-          'coalesce',
+          'case',
+          ['!=', ['feature-state', 'venueColor'], null],
           ['feature-state', 'venueColor'],
-          'rgba(0,0,0,0)' // Fully transparent — unmatched buildings disappear
+          ['coalesce', ['get', 'venueColor'], '#64748b']
         ],
-        // Height: smooth zoom interpolation from flat → true height
-        'fill-extrusion-height': [
-          'interpolate', ['linear'], ['zoom'],
-          14.5, 0,
-          15.5, ['coalesce', ['get', 'render_height'], 6]
-        ],
-        // Base: for multi-story floating structures
-        'fill-extrusion-base': [
-          'interpolate', ['linear'], ['zoom'],
-          14.5, 0,
-          15.5, ['coalesce', ['get', 'render_min_height'], 0]
-        ],
-        // Static opacity — MapLibre doesn't support data expressions here
+        // Height: from properties
+        'fill-extrusion-height': ['get', 'venueHeight'],
+        // Base: from properties
+        'fill-extrusion-base': ['get', 'venueBase'],
         'fill-extrusion-opacity': 0.85,
       },
     }, firstSymbolId);
   }
 
-  // --- Step D: Add the "Firefly" glow layer (flat circle beneath buildings) ---
+  // --- Step E: Add the "Firefly" glow layer (flat circle beneath buildings) ---
   if (!map.getSource('venue-glow-source')) {
     map.addSource('venue-glow-source', {
       type: 'geojson',
@@ -152,16 +162,46 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
     }, 'osm-3d-buildings'); // Render BENEATH the 3D buildings
   }
 
-  // --- Step E: Click handler for 3D buildings ---
+  // --- Step F: Click handler for 3D buildings ---
   map.on('click', 'osm-3d-buildings', (e) => {
     if (!e.features || e.features.length === 0) return;
-    const feature = e.features[0];
-    const featureId = feature.id as number;
-    const match = state.matchedBuildings.get(featureId);
-    if (!match) return; // Not a venue building — ignore
 
-    // The popup will be handled by the existing BIA retail click or venue marker system
-    // For now, we let the click fall through
+    // Skip if the user clicked directly on a marker DOM element (don't override their selection)
+    const target = (e.originalEvent?.target as HTMLElement);
+    if (target?.closest('[id^="venue-marker-"]')) return;
+
+    // Collect all matched venues from the clicked features
+    const candidates: Array<{ venueId: string; screenDist: number }> = [];
+    const seen = new Set<string>();
+
+    for (const feature of e.features) {
+      const featureId = feature.id as number;
+      const match = state.matchedBuildings.get(featureId);
+      if (!match || seen.has(match.venueId)) continue;
+      seen.add(match.venueId);
+
+      // Find the marker's screen position to calculate distance to click point
+      const markerEl = document.getElementById(`venue-marker-${match.venueId}`);
+      if (markerEl) {
+        const rect = markerEl.getBoundingClientRect();
+        const markerCenterX = rect.left + rect.width / 2;
+        const markerCenterY = rect.top + rect.height / 2;
+        const dx = e.originalEvent.clientX - markerCenterX;
+        const dy = e.originalEvent.clientY - markerCenterY;
+        candidates.push({ venueId: match.venueId, screenDist: dx * dx + dy * dy });
+      }
+    }
+
+    if (candidates.length === 0) return;
+
+    // Pick the venue whose marker is closest to where the user actually clicked
+    candidates.sort((a, b) => a.screenDist - b.screenDist);
+    const closestMarkerEl = document.getElementById(`venue-marker-${candidates[0].venueId}`);
+    if (closestMarkerEl) {
+      setTimeout(() => {
+        closestMarkerEl.click();
+      }, 10);
+    }
   });
 
   map.on('mouseenter', 'osm-3d-buildings', (e) => {
@@ -186,22 +226,100 @@ function suppressPOILabels(map: maplibregl.Map): void {
 
   style.layers.forEach((layer) => {
     if (layer.type !== 'symbol') return;
-    const sourceLayer = (layer as any)['source-layer'] || '';
+    const sourceLayer = ('source-layer' in layer ? layer['source-layer'] as string : '');
     const layerId = layer.id.toLowerCase();
 
-    // Target POI-related symbol layers
     if (
       sourceLayer === 'poi' ||
       layerId.includes('poi') ||
       (sourceLayer === 'place' && layerId.includes('label'))
     ) {
-      // Don't suppress place labels — they're useful for orientation
-      // Only suppress actual POI markers
       if (sourceLayer === 'poi' || layerId.includes('poi')) {
         map.setLayoutProperty(layer.id, 'visibility', 'none');
       }
     }
   });
+}
+
+// Helper: Ray-casting algorithm for point in polygon
+export function pointInPolygon(point: [number, number], polygon: number[][][]): boolean {
+  const x = point[0], y = point[1];
+  let inside = false;
+  
+  const ring = polygon[0];
+  if (!ring) return false;
+
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+
+    const intersect = ((yi > y) !== (yj > y))
+        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  
+  return inside;
+}
+
+// Helper: Get minimum distance squared from a point to any vertex of a polygon
+export function distanceToPolygon(point: [number, number], polygon: number[][][]): number {
+  const ring = polygon[0];
+  if (!ring || ring.length === 0) return Infinity;
+  let minDistance = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const dx = point[0] - ring[i][0];
+    const dy = point[1] - ring[i][1];
+    const dist = dx * dx + dy * dy;
+    if (dist < minDistance) {
+      minDistance = dist;
+    }
+  }
+  return minDistance;
+}
+
+// Helper: Extract a single Polygon from a feature that contains the given point
+export function extractSinglePolygon(
+  geometry: GeoJSON.Geometry, 
+  point: [number, number]
+): GeoJSON.Geometry {
+  if (geometry.type === 'Polygon') {
+    return geometry;
+  }
+  
+  if (geometry.type === 'GeometryCollection') {
+    for (const g of geometry.geometries) {
+      const extracted = extractSinglePolygon(g, point);
+      if (extracted.type === 'Polygon') return extracted;
+    }
+  }
+  
+  if (geometry.type === 'MultiPolygon') {
+    // 1. Try strict point-in-polygon first
+    for (const polygon of geometry.coordinates) {
+      if (pointInPolygon(point, polygon)) {
+        return { type: 'Polygon', coordinates: polygon };
+      }
+    }
+    
+    // 2. If point misses (e.g. on sidewalk), find the closest polygon by vertex distance
+    let bestPolygon = geometry.coordinates[0];
+    let minDistance = Infinity;
+    
+    for (const polygon of geometry.coordinates) {
+      const dist = distanceToPolygon(point, polygon);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestPolygon = polygon;
+      }
+    }
+    
+    if (bestPolygon) {
+      return { type: 'Polygon', coordinates: bestPolygon };
+    }
+  }
+  
+  // Fallback to the original geometry if we can't extract a Polygon
+  return geometry;
 }
 
 // --- 3. Spatial Join: Match Venues to Building Polygons ---
@@ -211,68 +329,84 @@ export function matchVenuesToBuildings(
 ): void {
   if (!map.getLayer('osm-3d-buildings')) return;
 
-  // Clear previous matches
+  // Clear previous matches and feature states
   state.matchedBuildings.forEach((match, featureId) => {
     try {
       map.setFeatureState(
-        { source: 'maptiler_planet', sourceLayer: 'building', id: featureId },
-        { venueColor: null, matched: 0 },
+        { source: 'venue-buildings-source', id: featureId },
+        { venueColor: null },
       );
-    } catch { /* Feature may no longer be rendered */ }
+    } catch { /* Ignore */ }
   });
   state.matchedBuildings.clear();
   state.shimmerBuildings.clear();
 
+  const buildingFeatures: GeoJSON.Feature[] = [];
   const glowFeatures: GeoJSON.Feature[] = [];
 
   venues.forEach((venue) => {
     const color = VENUE_COLORS[venue.category] || VENUE_COLORS.default;
-
-    // Project venue lat/lng to screen pixels
     const point = map.project([venue.lng, venue.lat]);
 
-    // Create micro-bounding box (8x8 px) for hit detection
+    // Create bounding box (30x30 px) for hit detection to catch venues slightly off building footprints
+    const HITBOX_BUFFER = 15;
     const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
-      [point.x - 4, point.y - 4],
-      [point.x + 4, point.y + 4],
+      [point.x - HITBOX_BUFFER, point.y - HITBOX_BUFFER],
+      [point.x + HITBOX_BUFFER, point.y + HITBOX_BUFFER],
     ];
 
-    // Query only the 3D buildings layer
+    // Filter the layers array so MapLibre doesn't crash if a layer isn't in the style
+    const targetLayers = ['building-hitbox', 'Building', 'Building top']
+      .filter(layerId => map.getLayer(layerId));
+
+    if (targetLayers.length === 0) return;
+
+    // Query the invisible hitbox layer to find the building footprint
+    // Since we expanded the hitbox, we might hit multiple distinct features. We grab the closest one.
     const features = map.queryRenderedFeatures(bbox, {
-      layers: ['osm-3d-buildings'],
+      layers: targetLayers,
     });
 
     if (features.length > 0) {
-      // Take the first (most likely correct) building
-      const buildingFeature = features[0];
-      const featureId = buildingFeature.id as number;
+      // If multiple features are returned, we should ideally check all of them, but extracting the closest polygon
+      // from the first feature (which MapLibre sorts by z-index/closest to center) is usually sufficient.
+      const sourceFeature = features[0];
+      const customFeatureId = state.nextFeatureId++;
 
-      if (featureId != null) {
-        const match: VenueMatch = {
+      const renderHeight = sourceFeature.properties?.render_height ?? 6;
+      const renderBase = sourceFeature.properties?.render_min_height ?? 0;
+
+      // Extract geometry from the rendered tile feature (filtering MultiPolygons if needed)
+      const newFeature: GeoJSON.Feature = {
+        type: 'Feature',
+        id: customFeatureId,
+        geometry: extractSinglePolygon(sourceFeature.geometry, [venue.lng, venue.lat]),
+        properties: {
           venueId: venue.id,
-          buildingFeatureId: featureId,
-          category: venue.category,
-          color,
-          hasSpecials: venue.hasSpecials,
-        };
-
-        state.matchedBuildings.set(featureId, match);
-
-        if (venue.hasSpecials) {
-          state.shimmerBuildings.add(featureId);
+          venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
+          venueHeight: renderHeight,
+          venueBase: renderBase,
         }
+      };
 
-        // Apply feature state color + matched flag
-        try {
-          map.setFeatureState(
-            { source: 'maptiler_planet', sourceLayer: 'building', id: featureId },
-            { venueColor: color, matched: 1 },
-          );
-        } catch (err) {
-          console.warn('[3D Buildings] Failed to set feature state:', err);
-        }
+      buildingFeatures.push(newFeature);
 
-        // Add glow point for this venue
+      const match: VenueMatch = {
+        venueId: venue.id,
+        buildingFeatureId: customFeatureId,
+        category: venue.category,
+        color,
+        hasSpecials: venue.hasSpecials,
+      };
+
+      state.matchedBuildings.set(customFeatureId, match);
+
+      if (venue.hasSpecials) {
+        state.shimmerBuildings.add(customFeatureId);
+      }
+
+      // Add glow point for this venue only if coloring is enabled
+      if (ENABLE_VENUE_COLORING) {
         glowFeatures.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [venue.lng, venue.lat] },
@@ -281,6 +415,15 @@ export function matchVenuesToBuildings(
       }
     }
   });
+
+  // Update building source with our custom features
+  const buildingSource = map.getSource('venue-buildings-source') as maplibregl.GeoJSONSource | undefined;
+  if (buildingSource) {
+    buildingSource.setData({
+      type: 'FeatureCollection',
+      features: buildingFeatures,
+    });
+  }
 
   // Update glow source
   const glowSource = map.getSource('venue-glow-source') as maplibregl.GeoJSONSource | undefined;
@@ -291,7 +434,7 @@ export function matchVenuesToBuildings(
     });
   }
 
-  console.log(`[3D Buildings] Matched ${state.matchedBuildings.size}/${venues.length} venues to OSM buildings`);
+  console.log(`[3D Buildings] Matched ${state.matchedBuildings.size}/${venues.length} venues to building footprints`);
 }
 
 // --- 4. Shimmer Animation Loop ---
@@ -304,22 +447,22 @@ export function startShimmerAnimation(map: maplibregl.Map): void {
       return;
     }
 
-    // Calculate oscillation: smooth sine wave normalized to 0..1
-    // Speed divisor of 1500 gives a ~3s full cycle — mesmerizing but not distracting
     const t = (Math.sin(timestamp / 1500) + 1) / 2;
 
     state.shimmerBuildings.forEach((featureId) => {
       const match = state.matchedBuildings.get(featureId);
       if (!match) return;
 
-      const interpolatedColor = lerpColor(match.color, SHIMMER_PEAK, t * 0.5); // Max 50% toward white
+      const baseColor = ENABLE_VENUE_COLORING ? match.color : '#64748b';
+      const interpolatedColor = lerpColor(baseColor, SHIMMER_PEAK, t * 0.5);
 
       try {
+        // Set feature state on our custom geojson source using our custom integer IDs
         map.setFeatureState(
-          { source: 'maptiler_planet', sourceLayer: 'building', id: featureId },
-          { venueColor: interpolatedColor },
+          { source: 'venue-buildings-source', id: featureId },
+          { venueColor: ENABLE_VENUE_COLORING ? interpolatedColor : '#64748b' },
         );
-      } catch { /* Feature may not be rendered at current zoom */ }
+      } catch { /* Ignore */ }
     });
 
     state.animationFrameId = requestAnimationFrame(animate);
@@ -351,7 +494,8 @@ export function destroyBuildingExtrusions(map: maplibregl.Map): void {
   state.matchedBuildings.clear();
   state.shimmerBuildings.clear();
 
-  // Restore flat building layers
+  if (!map) return;
+
   ['Building', 'Building top'].forEach(layerId => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, 'visibility', 'visible');

@@ -8,6 +8,7 @@ interface UseMapInitProps {
   mapRef: MutableRefObject<maplibregl.Map | null>;
   busStateRef: MutableRefObject<Record<string, BusState>>;
   routeAlertsRef: MutableRefObject<Record<string, string[]>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setConstructionProjects: React.Dispatch<React.SetStateAction<any[]>>;
   pinModeRef: MutableRefObject<boolean>;
   setIsPinMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -172,43 +173,6 @@ export function useMapInit({
           }, firstSymbolId);
         }
 
-        // --- BIA & RETAIL LAYERS ---
-        if (!map.getSource('bia-boundaries-source')) {
-          map.addSource('bia-boundaries-source', { type: 'geojson', data: '/civic_data/bia_boundaries.geojson' });
-          map.addLayer({
-            id: 'bia-boundaries-layer',
-            type: 'fill',
-            source: 'bia-boundaries-source',
-            paint: {
-              'fill-color': '#a855f7', // Faint purple glow
-              'fill-opacity': 0.05,
-              'fill-outline-color': '#a855f7'
-            }
-          }, firstSymbolId);
-        }
-
-        if (!map.getSource('bia-retail-source')) {
-          map.addSource('bia-retail-source', { type: 'geojson', data: '/civic_data/bia_retail_buildings.geojson' });
-          map.addLayer({
-            id: 'bia-retail-extrusion',
-            type: 'fill-extrusion',
-            source: 'bia-retail-source',
-            paint: {
-              'fill-extrusion-color': [
-                'match',
-                ['get', 'category'],
-                'Nightlife', '#d946ef',
-                'Eatery', '#f97316',
-                'Stage', '#eab308',
-                'Retail', '#64748b',
-                '#64748b' // default fallback
-              ],
-              'fill-extrusion-height': 12,       // Extrude 12 meters
-              'fill-extrusion-base': 0,
-              'fill-extrusion-opacity': 0
-            }
-          }, firstSymbolId);
-        }
 
         // --- 2. TRANSIT LAYERS (TRUE 3D MATH) ---
         // Separate sources to completely eliminate filter matching bugs
@@ -511,7 +475,6 @@ export function useMapInit({
             
           const occText = getOccupancyText(props.occupancyStatus, props.occupancyPercentage, props.hasOccupancyData);
           const statText = getStatusText(props.currentStatus);
-          const dirText = getDirectionText(props.directionId);
           const stopText = props.stopId ? `Stop #${props.stopId}` : 'Unknown Stop';
           const occColor = getOccupancyColor(props.occupancyStatus, props.hasOccupancyData);
           const pctDisplay = (props.hasOccupancyData && props.occupancyPercentage !== null && props.occupancyPercentage !== undefined)
@@ -589,37 +552,7 @@ export function useMapInit({
         map.on('mouseenter', 'on-street-parking-layer', () => map.getCanvas().style.cursor = 'pointer');
         map.on('mouseleave', 'on-street-parking-layer', () => map.getCanvas().style.cursor = '');
 
-        // --- BIA RETAIL CLICK INTERACTIONS ---
-        map.on('click', 'bia-retail-extrusion', (e) => {
-          if (!e.features?.[0]) return;
-          const props = e.features[0].properties;
-          const lat = e.lngLat.lat;
-          const lng = e.lngLat.lng;
-          
-          let catColor = '#64748b';
-          let catIcon = '🛍️';
-          if (props.category === 'Nightlife') { catColor = '#d946ef'; catIcon = '🍸'; }
-          else if (props.category === 'Eatery') { catColor = '#f97316'; catIcon = '🍽️'; }
-          else if (props.category === 'Stage') { catColor = '#eab308'; catIcon = '🎭'; }
 
-          new maplibregl.Popup({ offset: 0 })
-            .setLngLat(e.lngLat)
-            .setHTML(`<div style="color:black; padding:4px; font-family:sans-serif; min-width: 140px;">
-              <strong style="font-size:14px; color:${catColor};">${catIcon} ${props.name || 'Retail Business'}</strong><br/>
-              <span style="color: #666; font-size: 11px;">
-                ${props.category} &bull; <span style="font-style: italic;">${props.descriptor || 'Commercial'}</span>
-              </span>
-              <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
-                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(props.name + ' London Ontario')}" target="_blank" rel="noopener noreferrer" style="background:${catColor}; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:11px; text-align:center; font-weight:bold; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
-                  Find on Google
-                </a>
-              </div>
-            </div>`)
-            .addTo(map);
-        });
-
-        map.on('mouseenter', 'bia-retail-extrusion', () => map.getCanvas().style.cursor = 'pointer');
-        map.on('mouseleave', 'bia-retail-extrusion', () => map.getCanvas().style.cursor = '');
 
         // --- NIGHTLY HQ BEACON (430 Richmond St) ---
         const hqEl = document.createElement('div');
@@ -680,6 +613,10 @@ export function useMapInit({
 
         // --- MOD PIN (CRISIS ALERT) CLICK HANDLER ---
         map.on('click', (e) => {
+          // Skip if the click originated from a MapLibre marker (event, venue, etc.)
+          const target = (e.originalEvent?.target as HTMLElement);
+          if (target?.closest('.maplibregl-marker')) return;
+
           if (pinModeRef.current) {
             // Intercept click: Open the Pre-Drop Education Modal instead of dropping instantly
             setPendingPinLocation({ lng: e.lngLat.lng, lat: e.lngLat.lat });
@@ -699,11 +636,12 @@ export function useMapInit({
 
     return () => {
       // Clean up global SafeWalk function to prevent stale closure calls
-      delete (window as any).requestSafeWalk;
+      delete (window as unknown as Record<string, unknown>).requestSafeWalk;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

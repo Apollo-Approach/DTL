@@ -56,8 +56,18 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [searchOpen, setSearchOpen] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage', 'Nightlife']));
   const [forYou, setForYou] = useState(false);
+
+  // Helper: toggle a venue category in the active set
+  const toggleCategory = useCallback((cat: string) => {
+    setActiveCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }, []);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
   const [layerToggles, setLayerToggles] = useState({
     transit: true,
@@ -170,30 +180,11 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     setPinDescription
   });
 
-  useVenueMarkers(mapRef, venues, promos, searchQuery, forYou, preferences, activeFilter);
+  useVenueMarkers(mapRef, venues, promos, events, searchQuery, forYou, preferences, activeCategories, false);
   useEventMarkers(mapRef, events, searchQuery, dateFilter, layerToggles, preferences);
   useIncidentMarkers(mapRef, incidents, localIncidentUpdates, layerToggles, userRole, timeFilter, mode, setSelectedIncident);
   useConstructionMarkers(mapRef, constructionProjects, layerToggles);
 
-  // Handle Map Decluttering — retail 3D buildings
-  useEffect(() => {
-    if (!mapRef.current || !mapRef.current.getLayer('bia-retail-extrusion')) return;
-    const map = mapRef.current;
-    
-    if (activeFilter && activeFilter !== 'LateNight') {
-      // Category filter active — filter GeoJSON features by category property
-      map.setFilter('bia-retail-extrusion', ['==', ['get', 'category'], activeFilter]);
-      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0.85);
-    } else if (layerToggles.retail) {
-      // Retail toggled on (or LateNight active) — show all buildings
-      map.setFilter('bia-retail-extrusion', null);
-      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0.85);
-    } else {
-      // Everything off — hide retail buildings
-      map.setFilter('bia-retail-extrusion', null);
-      map.setPaintProperty('bia-retail-extrusion', 'fill-extrusion-opacity', 0);
-    }
-  }, [activeFilter, layerToggles.retail]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -257,13 +248,20 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       const state = presenceChannel.presenceState();
       const STALE_MS = 5 * 60 * 1000; // 5 minutes
       const now = Date.now();
-      const newLocations: Record<string, any> = {};
+      const newLocations: Record<string, { timestamp: number; lat: number; lng: number; role: string }> = {};
       Object.keys(state).forEach(key => {
         if (state[key] && state[key].length > 0) {
-          const entry = state[key][0] as any;
+          const entry = state[key][0] as { timestamp?: number; lat?: number; lng?: number; role?: string };
           // Prune stale presence (>5 min old)
-          if (entry.timestamp && (now - entry.timestamp) > STALE_MS) return;
-          newLocations[key] = entry;
+          if (entry.timestamp && entry.lat && entry.lng && entry.role) {
+            if ((now - entry.timestamp) > STALE_MS) return;
+            newLocations[key] = {
+              timestamp: entry.timestamp,
+              lat: entry.lat,
+              lng: entry.lng,
+              role: entry.role
+            };
+          }
         }
       });
       setResponderLocations(newLocations);
@@ -297,8 +295,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     if (!mapRef.current) return;
     
     // Cleanup old responder markers
-    if ((mapRef.current as any)._responderMarkers) {
-      (mapRef.current as any)._responderMarkers.forEach((m: maplibregl.Marker) => m.remove());
+    const mapExt = mapRef.current as maplibregl.Map & { _responderMarkers?: maplibregl.Marker[] };
+    if (mapExt._responderMarkers) {
+      mapExt._responderMarkers.forEach(m => m.remove());
     }
     const markers: maplibregl.Marker[] = [];
 
@@ -344,7 +343,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       markers.push(marker);
     });
 
-    (mapRef.current as any)._responderMarkers = markers;
+    mapExt._responderMarkers = markers;
   }, [responderLocations, session]);
 
   return (
@@ -352,8 +351,8 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       <MapFilterBar
         layerToggles={layerToggles}
         setLayerToggles={setLayerToggles}
-        activeFilter={activeFilter}
-        setActiveFilter={setActiveFilter}
+        activeCategories={activeCategories}
+        toggleCategory={toggleCategory}
         forYou={forYou}
         setForYou={setForYou}
         preferences={preferences}

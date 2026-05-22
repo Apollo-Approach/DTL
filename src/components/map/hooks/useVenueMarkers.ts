@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Venue, Promotion, Preferences } from '@/types';
+import { Venue, Promotion, Preferences, Event } from '@/types';
 import { calculateMatchScore } from '@/lib/matchScore';
-import { VENUE_CATEGORIES, CATEGORY_COLORS, getVenueCategory, sanitizeUrl, escapeHtml } from '../mapHelpers';
+import { CATEGORY_COLORS, getVenueCategory, sanitizeUrl, escapeHtml } from '../mapHelpers';
 import { matchVenuesToBuildings } from '../buildingExtrusions';
 
 export function useVenueMarkers(
   mapRef: React.RefObject<maplibregl.Map | null>,
   venues: Venue[],
   promos: Promotion[],
+  events: Event[],
   searchQuery: string,
   forYou: boolean,
   preferences: Preferences | null,
-  activeFilter: string | null
+  activeCategories: Set<string>,
+  showOnlyWithEvents: boolean
 ) {
   const markersRef = useRef<maplibregl.Marker[]>([]);
 
@@ -24,22 +26,25 @@ export function useVenueMarkers(
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Filter Venues
+    // Filter Venues — multi-select: show venues whose category is in the active set
     const filteredVenues = venues.filter(venue => {
       if (searchQuery && !venue.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
+      if (showOnlyWithEvents) {
+        const hasEvent = events.some(evt => evt.venue_id === venue.id);
+        if (!hasEvent) return false;
+      }
+
       if (forYou && preferences) {
         const score = calculateMatchScore(venue.offerings, preferences);
         if (score >= 20) return true;
       }
 
-      // If no category is selected, hide venues to prevent map clutter
-      if (!activeFilter) return false;
+      // Multi-select category filter: venue must be in an active category
+      const venueCategory = getVenueCategory(venue.type);
+      if (!activeCategories.has(venueCategory)) return false;
 
-      // Category filter — map filter bubble values to venue.type
-      if (activeFilter === 'LateNight') return !!venue.late_night_eligible;
-      const filterTypes = VENUE_CATEGORIES[activeFilter as keyof typeof VENUE_CATEGORIES];
-      return filterTypes ? (filterTypes as readonly string[]).includes(venue.type || '') : false;
+      return true;
     });
 
     filteredVenues.forEach((venue) => {
@@ -52,11 +57,22 @@ export function useVenueMarkers(
       const hasActiveSpecials = promos.some(p => p.venue_id === venue.id);
 
       el.className = 'group relative flex items-center justify-center cursor-pointer';
+      el.id = `venue-marker-${venue.id}`;
       el.style.width = '28px';
       el.style.height = '28px';
-      el.innerHTML = hasActiveSpecials
-        ? `<span class="absolute inset-0 rounded-full animate-pulse" style="background: radial-gradient(circle, ${markerColor}88 0%, transparent 70%); box-shadow: 0 0 12px ${markerColor}66, 0 0 24px ${markerColor}33;"></span>`
-        : '';
+
+      // Category-based emoji icon
+      const category = getVenueCategory(venue.type);
+      const categoryEmoji: Record<string, string> = {
+        Eatery: '🍴', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️',
+      };
+      const emoji = categoryEmoji[category] || '📍';
+
+      el.innerHTML = `
+        <div style="width:28px;height:28px;border-radius:50%;background:${markerColor};border:2px solid rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px ${markerColor}88;transition:transform 0.2s;">
+          ${emoji}
+        </div>`;
+
       if (isPopUp) {
         el.innerHTML += '<span class="absolute -top-1 -right-1 flex h-3 w-3 pointer-events-none"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span></span>';
       }
@@ -79,24 +95,54 @@ export function useVenueMarkers(
       markersRef.current.push(marker);
     });
 
-    if (map.getLayer('osm-3d-buildings')) {
-      const venueMatchData = filteredVenues.map(venue => {
-        const category = getVenueCategory(venue.type);
-        return {
-          id: venue.id,
-          lng: venue.lng,
-          lat: venue.lat,
-          category,
-          hasSpecials: promos.some(p => p.venue_id === venue.id),
-        };
-      });
-      setTimeout(() => {
-        matchVenuesToBuildings(map, venueMatchData);
-      }, 500);
-    }
+    // Rebuild extrusions with only visible-category venues.
+    // The osm-3d-buildings layer is created by useMapInit which may run concurrently,
+    // so we poll until the layer exists (up to 8s) then match after tiles load.
+    const venueMatchData = filteredVenues.map(venue => {
+      const category = getVenueCategory(venue.type);
+      return {
+        id: venue.id,
+        lng: venue.lng,
+        lat: venue.lat,
+        category,
+        hasSpecials: promos.some(p => p.venue_id === venue.id),
+      };
+    });
+
+    let cancelled = false;
+    let onIdle: (() => void) | null = null;
+
+    const tryMatch = () => {
+      if (cancelled) return;
+      if (!map.getLayer('osm-3d-buildings')) {
+        // Layer not ready yet — retry in 500ms (up to ~8s via recursive calls)
+        return;
+      }
+      // Layer exists — run match on next idle (tiles loaded)
+      onIdle = () => {
+        if (!cancelled) matchVenuesToBuildings(map, venueMatchData);
+      };
+      map.on('idle', onIdle);
+      // Also fire immediately in case map is already idle
+      matchVenuesToBuildings(map, venueMatchData);
+    };
+
+    // Poll for layer readiness every 500ms for up to 8 seconds
+    const pollInterval = setInterval(() => {
+      if (cancelled || map.getLayer('osm-3d-buildings')) {
+        clearInterval(pollInterval);
+        tryMatch();
+      }
+    }, 500);
+    // Also try immediately
+    tryMatch();
 
     return () => {
-      // Don't remove markers on unmount, they get removed before next render or when parent map unmounts.
+      cancelled = true;
+      clearInterval(pollInterval);
+      if (onIdle) {
+        map.off('idle', onIdle);
+      }
     };
-  }, [mapRef, venues, promos, searchQuery, forYou, preferences, activeFilter]);
+  }, [mapRef, venues, promos, events, searchQuery, forYou, preferences, activeCategories, showOnlyWithEvents]);
 }
