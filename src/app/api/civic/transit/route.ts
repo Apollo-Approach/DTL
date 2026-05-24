@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import tripMappingRaw from '@/lib/data/trip_mapping.json';
+import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 const tripMapping = tripMappingRaw as Record<string, string>;
 
@@ -51,33 +52,7 @@ function formatDelayLabel(delaySec: number): string {
   return `${mins} min late`;
 }
 
-interface GtfsVehicleEntity {
-  id?: string;
-  vehicle?: {
-    vehicle?: { id?: string };
-    trip?: { tripId?: string; trip_id?: string; routeId?: string; route_id?: string; direction_id?: number };
-    position?: { latitude?: number; longitude?: number; bearing?: number; speed?: number };
-    timestamp?: number;
-    current_status?: number;
-    stop_id?: string;
-    occupancy_status?: number;
-    occupancy_percentage?: number;
-  };
-  Vehicle?: GtfsVehicleEntity['vehicle'];
-}
-
-interface GtfsTripUpdateEntity {
-  id?: string;
-  trip_update?: {
-    trip?: { trip_id?: string; route_id?: string; direction_id?: number };
-    stop_time_update?: Array<{
-      stop_sequence?: number;
-      arrival?: { delay?: number; time?: number; schedule_time?: number } | null;
-      departure?: { delay?: number; time?: number } | null;
-      stop_id?: string;
-    }>;
-  };
-}
+// Removed inline interfaces since we are using GtfsRealtimeBindings
 
 /** Delay info extracted from TripUpdates feed, keyed by trip_id */
 interface TripDelay {
@@ -89,10 +64,10 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0; 
 
 /**
- * Fetches a single GTFS-RT JSON feed with a 5-second timeout.
+ * Fetches a single GTFS-RT feed as an ArrayBuffer with a 5-second timeout.
  * Returns null if the request fails (non-critical for enrichment feeds).
  */
-async function fetchGtfsFeed<T>(url: string): Promise<T | null> {
+async function fetchGtfsFeedBuffer(url: string): Promise<Uint8Array | null> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -106,7 +81,8 @@ async function fetchGtfsFeed<T>(url: string): Promise<T | null> {
     });
     clearTimeout(timeoutId);
     if (!res.ok) return null;
-    return await res.json() as T;
+    const arrayBuffer = await res.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
   } catch {
     return null;
   }
@@ -118,29 +94,28 @@ export async function GET() {
 
     // ── Fetch VehiclePositions + TripUpdates in parallel ──
     // TripUpdates is non-critical: if it fails, we fall back to the old ping-age heuristic.
-    const [vehicleData, tripUpdateData] = await Promise.all([
-      fetchGtfsFeed<{ entity?: GtfsVehicleEntity[]; Entity?: GtfsVehicleEntity[] }>(
-        `http://gtfs.ltconline.ca/Vehicle/VehiclePositions.json?t=${cacheBuster}`
-      ),
-      fetchGtfsFeed<{ entity?: GtfsTripUpdateEntity[] }>(
-        `http://gtfs.ltconline.ca/TripUpdate/TripUpdates.json?t=${cacheBuster}`
-      )
+    const [vehicleBuffer, tripUpdateBuffer] = await Promise.all([
+      fetchGtfsFeedBuffer(`http://gtfs.ltconline.ca/Vehicle/VehiclePositions.pb?t=${cacheBuster}`),
+      fetchGtfsFeedBuffer(`http://gtfs.ltconline.ca/TripUpdate/TripUpdates.pb?t=${cacheBuster}`)
     ]);
     
-    if (!vehicleData) throw new Error('LTC VehiclePositions feed unreachable');
+    if (!vehicleBuffer) throw new Error('LTC VehiclePositions feed unreachable');
+    
+    const vehicleData = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(vehicleBuffer);
+    const tripUpdateData = tripUpdateBuffer ? GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(tripUpdateBuffer) : null;
 
     // ── Build delay lookup from TripUpdates ──
-    // Key: trip_id → { delaySeconds, nextStopId }
+    // Key: tripId → { delaySeconds, nextStopId }
     const delayMap = new Map<string, TripDelay>();
     if (tripUpdateData) {
       const tuEntities = tripUpdateData.entity || [];
       for (const entity of tuEntities) {
-        const tu = entity.trip_update;
-        const tripId = tu?.trip?.trip_id;
-        if (!tripId || !tu?.stop_time_update?.length) continue;
+        const tu = entity.tripUpdate;
+        const tripId = tu?.trip?.tripId;
+        if (!tripId || !tu?.stopTimeUpdate?.length) continue;
 
-        // Use the first stop_time_update (the current/next stop) for the most relevant delay
-        const firstStu = tu.stop_time_update[0];
+        // Use the first stopTimeUpdate (the current/next stop) for the most relevant delay
+        const firstStu = tu.stopTimeUpdate[0];
         const arrDelay = firstStu.arrival?.delay;
         const depDelay = firstStu.departure?.delay;
         const delay = arrDelay ?? depDelay;
@@ -148,21 +123,23 @@ export async function GET() {
         if (delay !== undefined && delay !== null) {
           delayMap.set(tripId, {
             delaySeconds: delay,
-            nextStopId: firstStu.stop_id || null
+            nextStopId: firstStu.stopId || null
           });
         }
       }
     }
     
     const buses: TransitBus[] = [];
-    const entities = vehicleData.entity || vehicleData.Entity || [];
+    const entities = vehicleData.entity || [];
 
-    entities.forEach((entity: GtfsVehicleEntity) => {
-      const v = entity.vehicle || entity.Vehicle;
+    entities.forEach((entity: any) => {
+      const v = entity.vehicle;
       if (v?.position?.latitude && v?.position?.longitude) {
         const nowSec = Math.floor(Date.now() / 1000);
-        const timestamp = v.timestamp || nowSec;
-        const tripId = v.trip?.tripId || v.trip?.trip_id || null;
+        // protobufjs Long object has low, high properties.
+        const timestampLow = v.timestamp?.low || v.timestamp;
+        const timestamp = typeof timestampLow === 'number' ? timestampLow : nowSec;
+        const tripId = v.trip?.tripId || null;
         const headsign = tripId ? tripMapping[tripId] : null;
 
         // ── Delay: prefer TripUpdates exact data, fall back to ping-age heuristic ──
@@ -184,7 +161,7 @@ export async function GET() {
         buses.push({
           id: v.vehicle?.id || entity.id || '',
           headsign: headsign,
-          routeId: v.trip?.routeId || v.trip?.route_id || 'LTC',
+          routeId: v.trip?.routeId || 'LTC',
           tripId: tripId,
           targetLng: v.position.longitude,
           targetLat: v.position.latitude,
@@ -194,19 +171,20 @@ export async function GET() {
           isDelayed: isDelayed,
           delaySeconds: delaySeconds,
           delayLabel: delayLabel,
-          currentStatus: v.current_status ?? 0,
-          stopId: v.stop_id || '',
-          directionId: v.trip?.direction_id ?? 0,
+          currentStatus: v.currentStatus ?? 0,
+          stopId: v.stopId || '',
+          directionId: v.trip?.directionId ?? 0,
           // ── Occupancy: Smart resolution ──
-          // If LTC provides occupancy_percentage, trust it as primary source.
-          // Only fall back to occupancy_status enum if percentage is absent.
+          // If LTC provides occupancyPercentage, trust it as primary source.
+          // Only fall back to occupancyStatus enum if percentage is absent.
           // Mark hasOccupancyData = false when BOTH are missing to distinguish
           // "no data" from "genuinely empty bus".
           ...(() => {
-            const rawStatus = v.occupancy_status;
-            const rawPct = v.occupancy_percentage;
-            const hasStatus = rawStatus !== undefined && rawStatus !== null;
-            const hasPct = rawPct !== undefined && rawPct !== null;
+            const rawStatus = v.occupancyStatus;
+            const rawPct = v.occupancyPercentage;
+            // The magical hasOwnProperty check that fixes the "Empty Bus" bug:
+            const hasStatus = v.hasOwnProperty('occupancyStatus');
+            const hasPct = v.hasOwnProperty('occupancyPercentage');
             const hasData = hasStatus || hasPct;
 
             let finalStatus = 0;
