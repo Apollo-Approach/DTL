@@ -57,7 +57,7 @@ export function useVenueMarkers(
       const hasActiveSpecials = promos.some(p => p.venue_id === venue.id);
       const todayEvent = (events || []).find(e => e.venue_id === venue.id && new Date(e.start_time).toDateString() === new Date().toDateString());
       const hasEvent = !!todayEvent;
-      const isHQ = venue.name.toLowerCase().includes('dtl') && venue.address.includes('430 Dundas');
+      const isHQ = venue.name?.toLowerCase().includes('dtl') && venue.address?.includes('430 Dundas');
 
       el.className = 'group relative flex items-center justify-center cursor-pointer';
       el.id = `venue-marker-${venue.id}`;
