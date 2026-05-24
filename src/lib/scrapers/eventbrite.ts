@@ -25,13 +25,13 @@ export interface NormalizedEvent {
 
 function dedupHash(platform: string, sourceUrl: string, startTime: string): string {
   return createHash('sha256')
-    .update(\`\${platform}|\${sourceUrl}|\${startTime}\`)
+    .update(`${platform}|${sourceUrl}|${startTime}`)
     .digest('hex')
     .substring(0, 32);
 }
 
 function generateId(prefix: string, seed: string): string {
-  return \`\${prefix}-\${createHash('sha256').update(seed).digest('hex').substring(0, 12)}\`;
+  return `${prefix}-${createHash('sha256').update(seed).digest('hex').substring(0, 12)}`;
 }
 
 // Convert Eventbrite category IDs to our DTL categories
@@ -48,16 +48,16 @@ const EB_CATEGORY_MAP: Record<string, string> = {
  */
 async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Promise<NormalizedEvent[]> {
   try {
-    const url = \`https://www.eventbriteapi.com/v3/organizations/\${organizerId}/events/?status=live&expand=venue,ticket_classes\`;
+    const url = `https://www.eventbriteapi.com/v3/organizations/${organizerId}/events/?status=live&expand=venue,ticket_classes`;
     const res = await fetch(url, {
       headers: {
-        'Authorization': \`Bearer \${apiKey}\`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
 
     if (!res.ok) {
-      console.warn(\`[Eventbrite] Failed to fetch events for organizer \${organizerId}: \${res.statusText}\`);
+      console.warn(`[Eventbrite] Failed to fetch events for organizer ${organizerId}: ${res.statusText}`);
       return [];
     }
 
@@ -107,13 +107,13 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
         door_time: null,
         venue_subroom: ebEvent.venue?.name || null,
         dedup_hash: dedupHash('eventbrite', sourceUrl, startTime),
-        location: \`SRID=4326;POINT(\${lng} \${lat})\`
+        location: `SRID=4326;POINT(${lng} ${lat})`
       });
     }
 
     return events;
   } catch (err) {
-    console.error(\`[Eventbrite] Error fetching for organizer \${organizerId}:\`, err);
+    console.error(`[Eventbrite] Error fetching for organizer ${organizerId}:`, err);
     return [];
   }
 }
