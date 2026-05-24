@@ -74,7 +74,8 @@ export function useVenueMarkers(
       }
 
       const hqLinks = isHQ ? `<div style="margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px;"><a href="/about" style="display:block; margin-bottom: 4px; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">ℹ️ About & FAQ</a><a href="/contact" style="display:block; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">📞 Contact Us</a></div>` : '';
-      const eventLink = todayEvent ? `<div style="margin-top: 8px;"><a href="/events/${todayEvent.id}" style="display:block; padding: 6px; background-color: #22c55e; color: white; text-align: center; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px;">🎉 See Tonight's Event</a></div>` : '';
+      const destUrl = todayEvent ? (sanitizeUrl(todayEvent.ticket_url) || sanitizeUrl(todayEvent.source_url) || `/venues/${todayEvent.venue_id}`) : '#';
+      const eventLink = todayEvent ? `<div style="margin-top: 8px;"><a href="${destUrl}" ${destUrl.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''} style="display:block; padding: 6px; background-color: #22c55e; color: white; text-align: center; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px;">🎉 See Tonight's Event</a></div>` : '';
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([venue.lng, venue.lat])
@@ -138,12 +139,27 @@ export function useVenueMarkers(
     // Also try immediately
     tryMatch();
 
+    // Handle cross-layer popup triggers (from 3D building clicks)
+    const handleOpenPopup = (e: any) => {
+      const id = e.detail?.venueId;
+      if (!id) return;
+      const marker = markersRef.current.find(m => m.getElement().id === `venue-marker-${id}`);
+      if (marker) {
+        if (!marker.getPopup().isOpen()) {
+          marker.togglePopup();
+        }
+        map.flyTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 16), speed: 1.2 });
+      }
+    };
+    window.addEventListener('open-venue-popup', handleOpenPopup);
+
     return () => {
       cancelled = true;
       clearInterval(pollInterval);
       if (onIdle) {
         map.off('idle', onIdle);
       }
+      window.removeEventListener('open-venue-popup', handleOpenPopup);
     };
   }, [mapRef, venues, promos, events, searchQuery, forYou, preferences, activeCategories, showOnlyWithEvents]);
 }

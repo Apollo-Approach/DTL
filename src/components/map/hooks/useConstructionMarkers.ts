@@ -36,11 +36,11 @@ export function useConstructionMarkers(
         `;
 
         const locationCoords: Record<string, [number, number]> = {
-          'renew-ontario-st': [-81.2435, 42.9870],
-          'renew-queens-bridge': [-81.2540, 42.9830],
-          'renew-brt-east': [-81.2380, 42.9830],
-          'renew-wellington-gateway': [-81.2483, 42.9700],
-          'renew-york-wellington': [-81.2483, 42.9840],
+          'renew-ontario-st': [-81.2335, 42.9892],
+          'renew-queens-bridge': [-81.2588, 42.9825],
+          'renew-brt-east': [-81.2350, 42.9870],
+          'renew-wellington-gateway': [-81.2355, 42.9605],
+          'renew-york-wellington': [-81.2483, 42.9818],
         };
 
         const coords = locationCoords[project.id] || [-81.2497, 42.9836];

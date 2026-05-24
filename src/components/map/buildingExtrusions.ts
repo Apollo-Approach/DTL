@@ -85,12 +85,12 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
   // --- Step A: Suppress default POI labels for a pin-free experience ---
   suppressPOILabels(map);
 
-  // --- Step B: Hide ALL existing building layers (flat fills AND 3D extrusions) to prevent z-fighting ---
+  // --- Step B: Hide existing 3D building extrusions to prevent z-fighting, but keep 2D outlines ---
   const style = map.getStyle();
   if (style?.layers) {
     style.layers.forEach(layer => {
       const sourceLayer = ('source-layer' in layer ? layer['source-layer'] : '') as string;
-      if (sourceLayer === 'building' && (layer as any).source === 'maptiler_planet') {
+      if (sourceLayer === 'building' && (layer as any).source === 'maptiler_planet' && layer.type === 'fill-extrusion') {
         map.setLayoutProperty(layer.id, 'visibility', 'none');
       }
     });
@@ -198,8 +198,8 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
     candidates.sort((a, b) => a.screenDist - b.screenDist);
     const targetVenueId = candidates[0].venueId;
     
-    // Redirect to the venue's dedicated page
-    window.location.href = `/venues/${targetVenueId}`;
+    // Dispatch event to open the MapLibre popup natively instead of navigating away
+    window.dispatchEvent(new CustomEvent('open-venue-popup', { detail: { venueId: targetVenueId } }));
   });
 
   map.on('mouseenter', 'osm-3d-buildings', (e) => {

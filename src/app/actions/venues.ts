@@ -10,32 +10,46 @@ export async function saveVenue(payload: any, venueId?: string) {
   console.log("adminSupabase created");
 
   try {
-    if (venueId) {
-      const { error } = await adminSupabase
-        .from('venues')
-        .update(payload)
-        .eq('id', venueId);
-      if (error) {
-        console.error("Supabase update error:", error);
-        throw error;
+      if (venueId) {
+        const { error } = await adminSupabase
+          .from('venues')
+          .update(payload)
+          .eq('id', venueId);
+        if (error) {
+          console.error("Supabase update error:", error);
+          throw error;
+        }
+        revalidatePath('/', 'layout');
+        return { success: true };
+      } else {
+        const { data, error } = await adminSupabase
+          .from('venues')
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        revalidatePath('/', 'layout');
+        return { success: true, data };
       }
-      console.log("Supabase update success");
-      
-      
-      return { success: true };
-    } else {
-      const { data, error } = await adminSupabase
-        .from('venues')
-        .insert([payload])
-        .select()
-        .single();
-      if (error) throw error;
-      
-      
-      return { success: true, data };
+    } catch (error: any) {
+      console.error('Error saving venue:', error);
+      return { success: false, error: error.message };
     }
+}
+
+export async function deleteVenue(venueId: string) {
+  const adminSupabase = await createAdminClient();
+  try {
+    const { error } = await adminSupabase
+      .from('venues')
+      .delete()
+      .eq('id', venueId);
+    
+    if (error) throw error;
+    revalidatePath('/', 'layout');
+    return { success: true };
   } catch (error: any) {
-    console.error('Error saving venue:', error);
+    console.error('Error deleting venue:', error);
     return { success: false, error: error.message };
   }
 }

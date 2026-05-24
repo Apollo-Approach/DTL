@@ -1,5 +1,5 @@
 'use client';
-import { saveVenue } from '@/app/actions/venues';
+import { saveVenue, deleteVenue } from '@/app/actions/venues';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -110,7 +110,9 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         type: editingVenue.type,
         image_url: editingVenue.image_url,
         is_manually_curated: editingVenue.is_manually_curated,
-        offerings: parsedOfferings
+        offerings: parsedOfferings,
+        lat: editingVenue.lat,
+        lng: editingVenue.lng
       };
       
       if (editingVenue.lat !== undefined && editingVenue.lng !== undefined) {
@@ -135,6 +137,22 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     } catch (err: unknown) {
       console.error(err);
       alert('Failed to save venue: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingVenue?.id) return;
+    if (!window.confirm(`Are you sure you want to completely remove ${editingVenue.name}? This action cannot be undone.`)) return;
+    setIsSaving(true);
+    try {
+      const result = await deleteVenue(editingVenue.id);
+      if (!result.success) throw new Error(result.error);
+      setVenues(venues.filter(v => v.id !== editingVenue?.id));
+      setIsModalOpen(false);
+    } catch (err: any) {
+      alert('Failed to delete venue: ' + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -384,16 +402,26 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
               </div>
             </div>
 
-            <div className="p-6 border-t border-neutral-800 flex justify-end gap-4 shrink-0 bg-neutral-900 rounded-b-2xl">
+            <div className="p-6 border-t border-neutral-800 flex justify-end gap-3 shrink-0 bg-neutral-900 rounded-b-2xl">
+              {editingVenue.id && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isSaving || uploadingImage}
+                  className="mr-auto text-red-500 hover:text-red-400 font-medium px-2 py-2"
+                >
+                  Delete Venue
+                </button>
+              )}
               <button 
                 onClick={() => setIsModalOpen(false)}
+                disabled={isSaving || uploadingImage}
                 className="px-6 py-2 rounded-lg font-medium text-neutral-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || uploadingImage}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
               >
                 {isSaving ? 'Saving...' : (

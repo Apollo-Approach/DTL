@@ -372,12 +372,38 @@ export function useMapInit({
               const now = Date.now();
               data.buses.forEach((bus: BusState) => {
                 const existing = busStateRef.current[bus.id];
+                
+                let startLng = existing ? existing.currentLng : bus.targetLng;
+                let startLat = existing ? existing.currentLat : bus.targetLat;
+                let tLng = bus.targetLng;
+                let tLat = bus.targetLat;
+
+                // PREDICTIVE INITIALIZATION: 
+                // If the bus is newly loaded (e.g. first page load) and is moving,
+                // project its destination 15 seconds forward so it starts gliding instantly
+                // instead of sitting frozen waiting for the second ping.
+                if (!existing && bus.speed > 0) {
+                   const R = 6371; // Earth's radius in km
+                   const distanceKm = (bus.speed * 15) / 1000;
+                   const rLat = bus.targetLat * Math.PI / 180;
+                   const rLng = bus.targetLng * Math.PI / 180;
+                   const rBearing = bus.bearing * Math.PI / 180;
+
+                   const pLat = Math.asin(Math.sin(rLat) * Math.cos(distanceKm/R) + Math.cos(rLat) * Math.sin(distanceKm/R) * Math.cos(rBearing));
+                   const pLng = rLng + Math.atan2(Math.sin(rBearing) * Math.sin(distanceKm/R) * Math.cos(rLat), Math.cos(distanceKm/R) - Math.sin(rLat) * Math.sin(pLat));
+                   
+                   tLng = pLng * 180 / Math.PI;
+                   tLat = pLat * 180 / Math.PI;
+                }
+
                 busStateRef.current[bus.id] = {
                   ...bus,
-                  startLng: existing ? existing.currentLng : bus.targetLng,
-                  startLat: existing ? existing.currentLat : bus.targetLat,
-                  currentLng: existing ? existing.currentLng : bus.targetLng,
-                  currentLat: existing ? existing.currentLat : bus.targetLat,
+                  startLng: startLng,
+                  startLat: startLat,
+                  currentLng: startLng,
+                  currentLat: startLat,
+                  targetLng: tLng,
+                  targetLat: tLat,
                   startTime: now
                 };
               });
