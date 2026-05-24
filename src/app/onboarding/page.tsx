@@ -1,22 +1,48 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { savePreferences } from '@/app/actions/onboarding';
+import { createClient } from '@/lib/supabase/client';
 
 function OnboardingWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get('next') || '/wallet';
+  const supabase = createClient();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(true);
   const [preferences, setPreferences] = useState({
     drinks: [] as string[],
     cuisine: [] as string[],
     vibe: [] as string[],
     habits: { affordability: '$$', schedule: 'late-night' },
   });
+
+  useEffect(() => {
+    async function loadPreferences() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('preferences, onboarding_completed').eq('id', user.id).single();
+        if (profile?.preferences && Object.keys(profile.preferences).length > 0) {
+          setPreferences({
+            drinks: profile.preferences.drinks || [],
+            cuisine: profile.preferences.cuisine || [],
+            vibe: profile.preferences.vibe || [],
+            habits: profile.preferences.habits || { affordability: '$$', schedule: 'late-night' },
+          });
+        }
+      }
+      setLoadingInitial(false);
+    }
+    loadPreferences();
+  }, [supabase]);
+
+  if (loadingInitial) {
+    return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-400 font-bold uppercase tracking-widest text-sm animate-pulse">Loading Profile...</div>;
+  }
 
   const handleMultiSelect = (category: 'drinks' | 'cuisine' | 'vibe', option: string) => {
     setPreferences((prev) => {
