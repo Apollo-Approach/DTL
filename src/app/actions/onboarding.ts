@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Preferences } from '@/types';
 
@@ -21,7 +21,8 @@ export async function savePreferences(preferencesData: Preferences) {
     habits: preferencesData.habits || {},
   };
 
-  const { error } = await supabase
+  const adminSupabase = await createAdminClient();
+  const { error } = await adminSupabase
     .from('profiles')
     .update({ 
       preferences: validPreferences,
@@ -37,4 +38,21 @@ export async function savePreferences(preferencesData: Preferences) {
 
   revalidatePath('/');
   return { success: true };
+}
+
+export async function getPreferences() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: 'Unauthorized' };
+
+  const adminSupabase = await createAdminClient();
+  const { data: profile, error } = await adminSupabase
+    .from('profiles')
+    .select('preferences, onboarding_completed')
+    .eq('id', user.id)
+    .single();
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, profile };
 }

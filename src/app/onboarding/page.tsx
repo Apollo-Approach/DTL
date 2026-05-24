@@ -2,14 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { savePreferences } from '@/app/actions/onboarding';
-import { createClient } from '@/lib/supabase/client';
+import { savePreferences, getPreferences } from '@/app/actions/onboarding';
 
 function OnboardingWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get('next') || '/wallet';
-  const supabase = createClient();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -23,22 +21,19 @@ function OnboardingWizard() {
 
   useEffect(() => {
     async function loadPreferences() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('preferences, onboarding_completed').eq('id', user.id).single();
-        if (profile?.preferences && Object.keys(profile.preferences).length > 0) {
-          setPreferences({
-            drinks: profile.preferences.drinks || [],
-            cuisine: profile.preferences.cuisine || [],
-            vibe: profile.preferences.vibe || [],
-            habits: profile.preferences.habits || { affordability: '$$', schedule: 'late-night' },
-          });
-        }
+      const { success, profile } = await getPreferences();
+      if (success && profile?.preferences && Object.keys(profile.preferences).length > 0) {
+        setPreferences({
+          drinks: profile.preferences.drinks || [],
+          cuisine: profile.preferences.cuisine || [],
+          vibe: profile.preferences.vibe || [],
+          habits: profile.preferences.habits || { affordability: '$$', schedule: 'late-night' },
+        });
       }
       setLoadingInitial(false);
     }
     loadPreferences();
-  }, [supabase]);
+  }, []);
 
   if (loadingInitial) {
     return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-400 font-bold uppercase tracking-widest text-sm animate-pulse">Loading Profile...</div>;

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
@@ -10,7 +10,8 @@ export default async function ProfilePage() {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase
+  const adminSupabase = await createAdminClient();
+  const { data: profile } = await adminSupabase
     .from('profiles')
     .select('*')
     .eq('id', authData.user.id)

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import MapWrapper from '@/components/MapWrapper';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import Script from 'next/script';
 import SafetyDashboard from '@/components/SafetyDashboard';
 import NearbyOfferings from '@/components/NearbyOfferings';
@@ -32,7 +32,8 @@ export default async function Home() {
   let profile = null;
   let preferences = null;
   if (user) {
-    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const adminSupabase = await createAdminClient();
+    const { data: p } = await adminSupabase.from('profiles').select('*').eq('id', user.id).single();
     profile = p;
     preferences = profile?.preferences;
   }
