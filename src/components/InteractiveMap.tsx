@@ -28,10 +28,11 @@ interface InteractiveMapProps {
   events?: Event[];
   promos?: Promotion[];
   preferences?: Preferences | null;
+  profile?: any;
   mode?: 'public' | 'crisis';
 }
 
-export default function InteractiveMap({ venues = [], incidents = [], events = [], promos = [], preferences = null, mode = 'public' }: InteractiveMapProps) {
+export default function InteractiveMap({ venues = [], incidents = [], events = [], promos = [], preferences = null, profile = null, mode = 'public' }: InteractiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -46,7 +47,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   
   // Auth & UI State
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<string>('citizen');
+  const [userRole, setUserRole] = useState<string>(profile?.role || 'citizen');
   
   // Crisis Cloud State
   const [selectedIncident, setSelectedIncident] = useState<SafetyIncident | null>(null);
@@ -137,8 +138,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
       } else {
         setSession(session);
         if (!session.user.is_anonymous) {
-          const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-          if (data) setUserRole(data.role);
+          if (profile?.role) setUserRole(profile.role);
         }
       }
     });
@@ -146,8 +146,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session && !session.user.is_anonymous) {
-        const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-        if (data) setUserRole(data.role);
+        if (profile?.role) setUserRole(profile.role);
       } else {
         setUserRole('citizen');
       }

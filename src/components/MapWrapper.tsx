@@ -21,13 +21,14 @@ interface MapWrapperProps {
   events: Event[];
   promos?: Promotion[];
   preferences?: Preferences | null;
+  profile?: any;
   mode?: 'public' | 'crisis';
 }
 
-export default function MapWrapper({ venues, incidents, events, promos = [], preferences, mode = 'public' }: MapWrapperProps) {
+export default function MapWrapper({ venues, incidents, events, promos = [], preferences, profile, mode = 'public' }: MapWrapperProps) {
   return (
     <ErrorBoundary>
-      <InteractiveMap venues={venues} incidents={incidents} events={events} promos={promos} preferences={preferences} mode={mode} />
+      <InteractiveMap venues={venues} incidents={incidents} events={events} promos={promos} preferences={preferences} profile={profile} mode={mode} />
     </ErrorBoundary>
   );
 }
