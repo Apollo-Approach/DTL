@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 
 /**
  * Transit Delay Data Logger — Sprint 2.6
@@ -48,18 +49,7 @@ const RICHMOND_ROW_STOPS = new Set([
 // Target routes: 02 (Dundas E-W) and 06 (Richmond N-S)
 const TARGET_ROUTES = new Set(['02', '06']);
 
-interface GtfsTripUpdateEntity {
-  id?: string;
-  trip_update?: {
-    trip?: { trip_id?: string; route_id?: string; direction_id?: number };
-    stop_time_update?: Array<{
-      stop_sequence?: number;
-      arrival?: { delay?: number; time?: number; schedule_time?: number } | null;
-      departure?: { delay?: number; time?: number } | null;
-      stop_id?: string;
-    }>;
-  };
-}
+// Removed GtfsTripUpdateEntity interface since we use GtfsRealtimeBindings
 
 interface DelayRecord {
   route_id: string;
@@ -70,6 +60,8 @@ interface DelayRecord {
   stochastic_delta: number | null;
   day_of_week: number;
   hour_of_day: number;
+  occupancy_status: number | null;
+  occupancy_percentage: number | null;
 }
 
 export const dynamic = 'force-dynamic';
@@ -88,32 +80,45 @@ export async function GET(request: Request) {
   );
 
   try {
-    // ── Fetch TripUpdates feed ──
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const res = await fetch(
-      `http://gtfs.ltconline.ca/TripUpdate/TripUpdates.json?t=${Date.now()}`,
-      {
-        headers: {
-          'User-Agent': 'DTL-BusynessLogger/1.0',
-          'Cache-Control': 'no-cache'
-        },
+    // ── Fetch TripUpdates and VehiclePositions PB feeds ──
+    const fetchBuffer = async (url: string) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'DTL-BusynessLogger/1.0', 'Cache-Control': 'no-cache' },
         cache: 'no-store',
         signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    };
+
+    const [tuBuffer, vpBuffer] = await Promise.all([
+      fetchBuffer(`http://gtfs.ltconline.ca/TripUpdate/TripUpdates.pb?t=${Date.now()}`),
+      fetchBuffer(`http://gtfs.ltconline.ca/Vehicle/VehiclePositions.pb?t=${Date.now()}`)
+    ]);
+
+    const tripUpdateData = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(tuBuffer);
+    const vehicleData = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(vpBuffer);
+
+    const tuEntities = tripUpdateData.entity || [];
+    const vpEntities = vehicleData.entity || [];
+
+    // ── Build Occupancy Map ──
+    const occupancyMap = new Map<string, { status: number | null, percentage: number | null }>();
+    for (const entity of vpEntities) {
+      const v = entity.vehicle;
+      const tripId = v?.trip?.tripId;
+      if (tripId) {
+        const hasStatus = v.hasOwnProperty('occupancyStatus');
+        const hasPct = v.hasOwnProperty('occupancyPercentage');
+        occupancyMap.set(tripId, {
+          status: hasStatus ? (v.occupancyStatus as number) : null,
+          percentage: hasPct ? (v.occupancyPercentage as number) : null
+        });
       }
-    );
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: 'LTC TripUpdates feed unreachable', status: res.status },
-        { status: 502 }
-      );
     }
-
-    const data = await res.json() as { entity?: GtfsTripUpdateEntity[] };
-    const entities = data.entity || [];
 
     // ── Extract delay records for target routes + corridor stops ──
     const now = new Date();
@@ -122,29 +127,29 @@ export async function GET(request: Request) {
 
     const records: DelayRecord[] = [];
 
-    for (const entity of entities) {
-      const tu = entity.trip_update;
-      const tripId = tu?.trip?.trip_id;
-      const routeId = tu?.trip?.route_id;
+    for (const entity of tuEntities) {
+      const tu = entity.tripUpdate;
+      const tripId = tu?.trip?.tripId;
+      const routeId = tu?.trip?.routeId;
 
       if (!tripId || !routeId || !TARGET_ROUTES.has(routeId)) continue;
-      if (!tu?.stop_time_update?.length) continue;
+      if (!tu?.stopTimeUpdate?.length) continue;
 
-      // Process each stop_time_update for corridor stops
-      const updates = tu.stop_time_update;
+      // Grab occupancy
+      const occ = occupancyMap.get(tripId);
+
+      // Process each stopTimeUpdate for corridor stops
+      const updates = tu.stopTimeUpdate;
       
       for (let i = 0; i < updates.length; i++) {
         const stu = updates[i];
-        const stopId = stu.stop_id;
+        const stopId = stu.stopId;
         
         if (!stopId || !RICHMOND_ROW_STOPS.has(stopId)) continue;
 
         const delay = stu.arrival?.delay ?? stu.departure?.delay;
         if (delay === undefined || delay === null) continue;
 
-        // Calculate stochastic delta: SD(i) - SD(i-1)
-        // Positive = bus experiencing friction (crowds, congestion)
-        // Negative = bus recovering speed
         let stochasticDelta: number | null = null;
         if (i > 0) {
           const prevDelay = updates[i - 1].arrival?.delay ?? updates[i - 1].departure?.delay;
@@ -157,11 +162,13 @@ export async function GET(request: Request) {
           route_id: routeId,
           trip_id: tripId,
           stop_id: stopId,
-          stop_sequence: stu.stop_sequence ?? 0,
+          stop_sequence: stu.stopSequence ?? 0,
           delay_seconds: delay,
           stochastic_delta: stochasticDelta,
           day_of_week: dayOfWeek,
           hour_of_day: hourOfDay,
+          occupancy_status: occ?.status ?? null,
+          occupancy_percentage: occ?.percentage ?? null
         });
       }
     }
@@ -185,8 +192,8 @@ export async function GET(request: Request) {
       success: true,
       recorded_at: now.toISOString(),
       records_inserted: records.length,
-      trips_scanned: entities.filter(e => {
-        const rid = e.trip_update?.trip?.route_id;
+      trips_scanned: tuEntities.filter(e => {
+        const rid = e.tripUpdate?.trip?.routeId;
         return rid && TARGET_ROUTES.has(rid);
       }).length,
       day_of_week: dayOfWeek,

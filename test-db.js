@@ -1,11 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: '.env.local' });
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function check() {
-  const { count } = await supabase.from('venues_public').select('*', { count: 'exact', head: true });
-  console.log('Total venues:', count);
+  const { data, error } = await supabase.from('transit_delay_log').select('*').limit(1);
+  console.log("Error:", error);
+  console.log("Data:", data);
 }
 check();
