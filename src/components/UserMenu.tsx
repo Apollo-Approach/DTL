@@ -74,7 +74,7 @@ export default function UserMenu({ user, profile }: { user: any, profile: any })
             </div>
 
             <div className="p-2 space-y-1">
-              <Link href="/onboarding?next=/" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+              <Link href="/profile" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
                 <Settings className="w-4 h-4 text-neutral-400" /> Profile Settings
               </Link>
 
