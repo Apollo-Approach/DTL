@@ -55,6 +55,13 @@ const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
 export default function NearbyOfferings({ venues, promos, events = [], preferences, user, profile }: NearbyOfferingsProps & { user?: any, profile?: any }) {
   const [forYou, setForYou] = useState(false);
   const [shuffleSeed, setShuffleSeed] = useState(0);
+  const [isShuffling, setIsShuffling] = useState(false);
+
+  const handleShuffle = () => {
+    setIsShuffling(true);
+    setShuffleSeed(Math.random());
+    setTimeout(() => setIsShuffling(false), 300);
+  };
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [activeSituationTag, setActiveSituationTag] = useState<string | null>(null);
   const [liveFeed, setLiveFeed] = useState<FeedItem[]>([]);
@@ -120,16 +127,28 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
         .sort((a, b) => b.matchScore - a.matchScore);
     }
 
-    // Default: sort by proximity to Richmond & Dundas
+    // Sort by tier (events > promos > venues), distance bias, and random shuffle
+    const scoreVenue = (v: any) => {
+      let score = 0;
+      const hasEvents = (events || []).some(e => e.venue_id === v.id && new Date(e.start_time) >= new Date());
+      const hasPromos = (promos || []).some(p => p.venue_id === v.id);
+      
+      if (hasEvents) score += 100;
+      else if (hasPromos) score += 50;
+      else score += 10;
+      
+      const dist = distanceTo(v);
+      score -= (dist * 1000);
+      
+      const randomFactor = shuffleSeed > 0 ? ((v.id.charCodeAt(v.id.length - 1) * shuffleSeed * 100) % 1) : 0;
+      score += randomFactor * 25; // Random noise to shuffle within tiers
+      
+      return score;
+    };
+
     return [...filtered]
-      .sort((a, b) => {
-        if (shuffleSeed > 0) {
-          const hashA = (a.name.charCodeAt(0) * shuffleSeed) % 1;
-          const hashB = (b.name.charCodeAt(0) * shuffleSeed) % 1;
-          return hashA - hashB;
-        }
-        return distanceTo(a) - distanceTo(b);
-      });
+      .sort((a, b) => scoreVenue(b) - scoreVenue(a))
+      .slice(0, 10);
   }, [venues, preferences, forYou, activeSituationTag, promos, shuffleSeed]);
 
   return (
@@ -159,10 +178,10 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
       {/* Shuffle Button */}
       <div className="flex pb-4">
         <button
-          onClick={() => setShuffleSeed(Math.random())}
-          className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition font-bold text-sm flex items-center gap-2 border border-neutral-700"
+          onClick={handleShuffle}
+          className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition font-bold text-sm flex items-center gap-2 border border-neutral-700 active:scale-95"
         >
-          🔀 Shuffle Offers
+          <span className={isShuffling ? "animate-spin" : ""}>🔀</span> {isShuffling ? 'Shuffling...' : 'Shuffle Offers'}
         </button>
       </div>
 
