@@ -21,17 +21,8 @@ export async function GET(request: Request) {
     const { data: { user }, error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error && user) {
-      // Check if the user has completed onboarding
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_completed')
-        .eq('id', user.id)
-        .single();
-        
-      if (profile && !profile.onboarding_completed) {
-        // Force the user into the onboarding flow
-        return NextResponse.redirect(new URL(`/onboarding?next=${encodeURIComponent(next)}`, requestUrl.origin));
-      }
+      // Removed onboarding check per request
+
 
       // Redirect to the intended page upon successful login
       return NextResponse.redirect(new URL(next, requestUrl.origin));
