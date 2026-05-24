@@ -91,15 +91,17 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     setIsSaving(true);
     
     try {
-      const payload = {
+      const payload: any = {
         name: editingVenue.name,
         description: editingVenue.description,
         type: editingVenue.type,
-        lat: editingVenue.lat,
-        lng: editingVenue.lng,
         image_url: editingVenue.image_url,
         is_manually_curated: editingVenue.is_manually_curated
       };
+      
+      if (editingVenue.lat !== undefined && editingVenue.lng !== undefined) {
+        payload.location = `SRID=4326;POINT(${editingVenue.lng} ${editingVenue.lat})`;
+      }
 
       const result = await saveVenue(payload, editingVenue.id);
       
