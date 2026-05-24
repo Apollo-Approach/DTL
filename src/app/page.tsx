@@ -80,7 +80,7 @@ export default async function Home() {
               DTL Nightly
             </h1>
             <p className="text-neutral-400 text-sm md:text-base max-w-2xl">
-              Are you Down to Love Downtown London?
+              Down to Love Downtown London
             </p>
           </div>
           
