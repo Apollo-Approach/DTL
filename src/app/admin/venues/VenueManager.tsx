@@ -1,3 +1,4 @@
+import { saveVenue } from '@/app/actions/venues';
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -83,6 +84,8 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     }
   };
 
+
+
   const handleSave = async () => {
     if (!editingVenue) return;
     setIsSaving(true);
@@ -98,26 +101,17 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         is_manually_curated: editingVenue.is_manually_curated
       };
 
+      const result = await saveVenue(payload, editingVenue.id);
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
       if (editingVenue.id) {
-        // Update
-        const { error } = await supabase
-          .from('venues')
-          .update(payload)
-          .eq('id', editingVenue.id);
-        
-        if (error) throw error;
         setVenues(venues.map(v => v.id === editingVenue.id ? { ...v, ...payload } : v));
       } else {
-        // Insert
-        const { data, error } = await supabase
-          .from('venues')
-          .insert([payload])
-          .select()
-          .single();
-        
-        if (error) throw error;
-        if (data) {
-          setVenues([...venues, data]);
+        if (result.data) {
+          setVenues([...venues, result.data]);
         }
       }
       

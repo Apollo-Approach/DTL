@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import VenueManager from './VenueManager';
 
 export default async function AdminVenuesPage() {
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
   
   // Fetch venues
   const { data: venues } = await supabase
