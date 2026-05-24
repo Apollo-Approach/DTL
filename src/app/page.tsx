@@ -84,7 +84,7 @@ export default async function Home() {
             </p>
           </div>
           
-          
+          <UserMenu user={user} profile={profile} />
         </div>
       </header>
 
