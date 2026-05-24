@@ -96,7 +96,7 @@ export default async function Home() {
       <div className="flex flex-col gap-8 flex-grow w-full min-w-0">
         
         {/* CHUNK 1: PROXIMAL OFFERINGS SLIDES */}
-        <NearbyOfferings venues={venues} promos={promos} events={events} preferences={preferences} profile={profile} />
+        <NearbyOfferings venues={venues} promos={promos} events={events} preferences={preferences} />
 
         {/* CHUNK 2 & 3: MAP, SEARCH, AND SAFETY MODERATION */}
         {/* The InteractiveMap component will handle the Neon Bubbles (Chunk 2) and Mod Pin CTA (Chunk 3) */}

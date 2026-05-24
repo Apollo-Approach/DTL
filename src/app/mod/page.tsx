@@ -81,7 +81,6 @@ export default function SafetyModDashboard() {
 
       setUserId(session.user.id);
 
-      import { getCurrentUserRole } from '@/app/actions/user';
       const role = await getCurrentUserRole(session.user.id);
 
       if (!role || !M_TIER_ROLES.includes(role)) {

@@ -1,5 +1,5 @@
-import { saveVenue } from '@/app/actions/venues';
 'use client';
+import { saveVenue } from '@/app/actions/venues';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
