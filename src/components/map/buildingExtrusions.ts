@@ -196,12 +196,10 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
 
     // Pick the venue whose marker is closest to where the user actually clicked
     candidates.sort((a, b) => a.screenDist - b.screenDist);
-    const closestMarkerEl = document.getElementById(`venue-marker-${candidates[0].venueId}`);
-    if (closestMarkerEl) {
-      setTimeout(() => {
-        closestMarkerEl.click();
-      }, 10);
-    }
+    const targetVenueId = candidates[0].venueId;
+    
+    // Redirect to the venue's dedicated page
+    window.location.href = `/venues/${targetVenueId}`;
   });
 
   map.on('mouseenter', 'osm-3d-buildings', (e) => {
