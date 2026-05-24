@@ -2,6 +2,12 @@ import { useEffect, useRef, MutableRefObject, RefObject } from 'react';
 import maplibregl from 'maplibre-gl';
 import { BusState, getBusPolygon, getOccupancyText, getOccupancyColor, getStatusText, getDirectionText } from '../mapHelpers';
 import { initBuildingExtrusions, startShimmerAnimation, stopShimmerAnimation, destroyBuildingExtrusions } from '../buildingExtrusions';
+import nearestPointOnLine from '@turf/nearest-point-on-line';
+import lineSliceAlong from '@turf/line-slice-along';
+import length from '@turf/length';
+import bearing from '@turf/bearing';
+import lineSlice from '@turf/line-slice';
+import { lineString } from '@turf/helpers';
 
 interface UseMapInitProps {
   mapContainerRef: RefObject<HTMLDivElement | null>;
@@ -30,6 +36,17 @@ export function useMapInit({
   setPinDescription
 }: UseMapInitProps) {
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const ltcShapesRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  
+  const cometStateRef = useRef<{
+    active: boolean;
+    routeId: string | null;
+    coords: number[][]; 
+    progressMeters: number;
+    totalMeters: number;
+    startTime: number;
+  }>({ active: false, routeId: null, coords: [], progressMeters: 0, totalMeters: 0, startTime: 0 });
+
 
   // 1. Initialize MapLibre
   useEffect(() => {
@@ -174,6 +191,38 @@ export function useMapInit({
         }
 
 
+        // --- TRANSIT COMET LAYER ---
+        if (!map.getSource('comet-source')) {
+          map.addSource('comet-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        }
+        if (!map.getLayer('comet-trail')) {
+          map.addLayer({
+            id: 'comet-trail',
+            type: 'line',
+            source: 'comet-source',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color': '#06b6d4',
+              'line-width': 8,
+              'line-blur': 4,
+              'line-opacity': 0.8
+            }
+          }, firstSymbolId);
+        }
+        if (!map.getLayer('comet-core')) {
+          map.addLayer({
+            id: 'comet-core',
+            type: 'circle',
+            source: 'comet-source',
+            paint: {
+              'circle-radius': 4,
+              'circle-color': '#ffffff',
+              'circle-blur': 0.1,
+              'circle-pitch-alignment': 'map'
+            }
+          }, firstSymbolId);
+        }
+
         // --- 2. TRANSIT LAYERS (TRUE 3D MATH) ---
         // Separate sources to completely eliminate filter matching bugs
         if (!map.getSource('transit-body-source')) {
@@ -294,9 +343,9 @@ export function useMapInit({
             source: 'ltc-shapes-source',
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: { 
-              'line-color': ['coalesce', ['get', 'color'], '#006c5b'], 
-              'line-width': 4, 
-              'line-opacity': 0.45 // Boosted from 0.15 so the spatial network pops!
+              'line-color': ['coalesce', ['get', 'color'], '#00bfa5'], // Switched to a brighter teal default
+              'line-width': 5, 
+              'line-opacity': 0.65 // Significantly boosted for higher visibility
             } 
           }, firstSymbolId);
         }
@@ -396,6 +445,41 @@ export function useMapInit({
           const labelSource = mapRef.current.getSource('transit-label-source') as maplibregl.GeoJSONSource | undefined;
           if (labelSource) labelSource.setData({ type: 'FeatureCollection', features: labelFeatures });
 
+          // -- COMET ANIMATION --
+          const cometSource = mapRef.current.getSource('comet-source') as maplibregl.GeoJSONSource | undefined;
+          if (cometStateRef.current.active && cometSource && cometStateRef.current.coords.length > 1) {
+             const state = cometStateRef.current;
+             const speedMps = 1500; // Super fast energy pulse (1.5km/sec)
+             const elapsedSec = (now - state.startTime) / 1000;
+             state.progressMeters = elapsedSec * speedMps;
+             
+             if (state.progressMeters >= state.totalMeters || state.progressMeters > 5000) {
+                 state.active = false;
+                 cometSource.setData({ type: 'FeatureCollection', features: [] });
+             } else {
+                 const startMeters = Math.max(0, state.progressMeters - 400); // 400m tail
+                 try {
+                     const tailSlice = lineSliceAlong(lineString(state.coords), startMeters / 1000, state.progressMeters / 1000, { units: 'kilometers' });
+                     if (tailSlice.geometry.coordinates.length > 0) {
+                         const corePt = tailSlice.geometry.coordinates[tailSlice.geometry.coordinates.length - 1];
+                         cometSource.setData({
+                            type: 'FeatureCollection',
+                            features: [
+                               { type: 'Feature', geometry: tailSlice.geometry, properties: {} },
+                               { type: 'Feature', geometry: { type: 'Point', coordinates: corePt }, properties: {} }
+                            ]
+                         });
+                     }
+                 } catch (err) {
+                     // Failsafe for slice errors
+                     state.active = false;
+                 }
+             }
+          } else if (cometSource && !cometStateRef.current.active && cometStateRef.current.coords.length > 0) {
+             cometStateRef.current.coords = [];
+             cometSource.setData({ type: 'FeatureCollection', features: [] });
+          }
+
           animationFrameRef.current = requestAnimationFrame(renderFrame);
         };
 
@@ -452,8 +536,73 @@ export function useMapInit({
           
           // MapLibre Data-Driven Styling: Highlight the clicked route ID, dim others
           map.setPaintProperty('ltc-shapes-layer', 'line-opacity', 
-            ['case', ['==', ['get', 'routeId'], props.routeId], 0.8, 0.05]
+            ['case', ['==', ['get', 'routeId'], props.routeId], 1.0, 0.15]
           );
+
+          // -- COMET INITIALIZATION LOGIC --
+          if (ltcShapesRef.current && props.routeId) {
+            const routeFeatures = ltcShapesRef.current.features.filter(f => f.properties?.routeId === props.routeId);
+            if (routeFeatures.length > 0) {
+              let closestLine: GeoJSON.Feature<GeoJSON.LineString> | null = null;
+              let minDistance = Infinity;
+              let closestPointOnLine: any = null;
+
+              routeFeatures.forEach(f => {
+                if (f.geometry.type === 'LineString') {
+                  const pt = nearestPointOnLine(f as GeoJSON.Feature<GeoJSON.LineString>, [props.centerLng, props.centerLat]);
+                  const dist = pt.properties.dist;
+                  if (dist !== undefined && dist < minDistance) {
+                    minDistance = dist;
+                    closestLine = f as GeoJSON.Feature<GeoJSON.LineString>;
+                    closestPointOnLine = pt;
+                  }
+                }
+              });
+
+              if (closestLine && closestPointOnLine) {
+                 const coords = (closestLine as GeoJSON.Feature<GeoJSON.LineString>).geometry.coordinates;
+                 const idx = closestPointOnLine.properties.index;
+                 
+                 let lineBearing = 0;
+                 if (idx < coords.length - 1) {
+                    lineBearing = bearing(coords[idx], coords[idx+1]);
+                 } else if (idx > 0) {
+                    lineBearing = bearing(coords[idx-1], coords[idx]);
+                 }
+                 
+                 let diff = Math.abs(lineBearing - props.bearing);
+                 if (diff > 180) diff = 360 - diff;
+                 const isForward = diff <= 90;
+                 
+                 let trajectoryCoords: number[][] = [];
+                 if (isForward) {
+                    const endPt = coords[coords.length - 1];
+                    const sliced = lineSlice(closestPointOnLine, endPt, closestLine);
+                    trajectoryCoords = sliced.geometry.coordinates;
+                 } else {
+                    const startPt = coords[0];
+                    const sliced = lineSlice(startPt, closestPointOnLine, closestLine);
+                    trajectoryCoords = sliced.geometry.coordinates.reverse();
+                 }
+
+                 // Limit the trajectory to roughly 5km
+                 const totalLen = length(lineString(trajectoryCoords), { units: 'kilometers' });
+                 if (totalLen > 5) {
+                    const sliced5km = lineSliceAlong(lineString(trajectoryCoords), 0, 5, { units: 'kilometers' });
+                    trajectoryCoords = sliced5km.geometry.coordinates;
+                 }
+
+                 cometStateRef.current = {
+                   active: true,
+                   routeId: props.routeId,
+                   coords: trajectoryCoords,
+                   progressMeters: 0,
+                   totalMeters: length(lineString(trajectoryCoords), { units: 'meters' }),
+                   startTime: Date.now()
+                 };
+              }
+            }
+          }
 
           const ageMins = Math.floor((Date.now() / 1000 - props.timestamp) / 60);
           
@@ -508,7 +657,7 @@ export function useMapInit({
         // Reset route lines to default visibility on empty click
         map.on('click', (e) => {
           if (!mapRef.current?.queryRenderedFeatures(e.point, { layers: ['bus-body-extrusion'] }).length) {
-              mapRef.current?.setPaintProperty('ltc-shapes-layer', 'line-opacity', 0.15);
+              mapRef.current?.setPaintProperty('ltc-shapes-layer', 'line-opacity', 0.65);
           }
         });
 
@@ -598,6 +747,12 @@ export function useMapInit({
         fetchConstruction();
         // Refresh construction data every 5 minutes
         const constructionInterval = setInterval(fetchConstruction, 300000);
+
+        // Load route shapes once into memory for comet calculations
+        fetch('/civic_data/ltc_shapes.geojson')
+          .then(res => res.json())
+          .then(data => { ltcShapesRef.current = data; })
+          .catch(err => console.error('Failed to load ltc_shapes', err));
 
         // --- 3D BUILDING EXTRUSIONS (The Nuclear Option) ---
         // Initialize the OSM-sourced 3D fill-extrusion layer
