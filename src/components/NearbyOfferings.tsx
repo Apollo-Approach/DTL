@@ -148,24 +148,26 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
         )}
       </div>
 
-      {/* Situation Chips — Sprint 3.3 */}
-      <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-hide">
-        {SITUATION_CHIPS.map(chip => {
-          const isActive = activeSituationTag === chip.tag;
-          const colors = CHIP_COLORS[chip.color];
-          return (
-            <button
-              key={chip.tag}
-              onClick={() => setActiveSituationTag(isActive ? null : chip.tag)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all shrink-0 ${
-                isActive ? colors.active : colors.inactive
-              }`}
-            >
-              {chip.icon} {chip.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Situation Chips — Sprint 3.3 (Temporarily Disabled) */}
+      {false && (
+        <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-hide">
+          {SITUATION_CHIPS.map(chip => {
+            const isActive = activeSituationTag === chip.tag;
+            const colors = CHIP_COLORS[chip.color];
+            return (
+              <button
+                key={chip.tag}
+                onClick={() => setActiveSituationTag(isActive ? null : chip.tag)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all shrink-0 ${
+                  isActive ? colors.active : colors.inactive
+                }`}
+              >
+                {chip.icon} {chip.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Live Feed Banner — shows when situation tag is active */}
       {activeSituationTag && liveFeed.length > 0 && (
