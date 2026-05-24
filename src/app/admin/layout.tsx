@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export default async function AdminLayout({
   children,
@@ -16,7 +16,8 @@ export default async function AdminLayout({
   }
 
   // 2. Query the profiles table to check the role
-  const { data: profile, error: profileError } = await supabase
+  const adminSupabase = await createAdminClient();
+  const { data: profile, error: profileError } = await adminSupabase
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
