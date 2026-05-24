@@ -52,8 +52,9 @@ interface FeedItem {
 // Default center: Richmond & Dundas intersection
 const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
 
-export default function NearbyOfferings({ venues, promos, events = [], preferences }: NearbyOfferingsProps) {
+export default function NearbyOfferings({ venues, promos, events = [], preferences, user, profile }: NearbyOfferingsProps & { user?: any, profile?: any }) {
   const [forYou, setForYou] = useState(false);
+  const [shuffleSeed, setShuffleSeed] = useState(0);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [activeSituationTag, setActiveSituationTag] = useState<string | null>(null);
   const [liveFeed, setLiveFeed] = useState<FeedItem[]>([]);
@@ -121,8 +122,15 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
 
     // Default: sort by proximity to Richmond & Dundas
     return [...filtered]
-      .sort((a, b) => distanceTo(a) - distanceTo(b));
-  }, [venues, preferences, forYou, activeSituationTag, promos]);
+      .sort((a, b) => {
+        if (shuffleSeed > 0) {
+          const hashA = (a.name.charCodeAt(0) * shuffleSeed) % 1;
+          const hashB = (b.name.charCodeAt(0) * shuffleSeed) % 1;
+          return hashA - hashB;
+        }
+        return distanceTo(a) - distanceTo(b);
+      });
+  }, [venues, preferences, forYou, activeSituationTag, promos, shuffleSeed]);
 
   return (
     <section className="w-full min-w-0 overflow-hidden">
@@ -148,26 +156,15 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
         )}
       </div>
 
-      {/* Situation Chips — Sprint 3.3 (Temporarily Disabled) */}
-      {false && (
-        <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-hide">
-          {SITUATION_CHIPS.map(chip => {
-            const isActive = activeSituationTag === chip.tag;
-            const colors = CHIP_COLORS[chip.color];
-            return (
-              <button
-                key={chip.tag}
-                onClick={() => setActiveSituationTag(isActive ? null : chip.tag)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap border transition-all shrink-0 ${
-                  isActive ? colors.active : colors.inactive
-                }`}
-              >
-                {chip.icon} {chip.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* Shuffle Button */}
+      <div className="flex pb-4">
+        <button
+          onClick={() => setShuffleSeed(Math.random())}
+          className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition font-bold text-sm flex items-center gap-2 border border-neutral-700"
+        >
+          🔀 Shuffle Offers
+        </button>
+      </div>
 
       {/* Live Feed Banner — shows when situation tag is active */}
       {activeSituationTag && liveFeed.length > 0 && (
