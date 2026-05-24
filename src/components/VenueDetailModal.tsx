@@ -99,10 +99,36 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
   (venue.situation_tags || []).forEach(t => allTags.add(t));
   promos.forEach(p => (p.situation_tags || []).forEach(t => allTags.add(t)));
 
+  // Group promos by discount_value to prevent duplicates for everyday specials
+  const groupedPromosMap = new Map();
+  promos.forEach(p => {
+    if (!groupedPromosMap.has(p.discount_value)) {
+      groupedPromosMap.set(p.discount_value, { ...p, all_days: [p.recurring_day] });
+    } else {
+      const existing = groupedPromosMap.get(p.discount_value);
+      if (p.recurring_day && !existing.all_days.includes(p.recurring_day)) {
+        existing.all_days.push(p.recurring_day);
+      }
+    }
+  });
+
+  const groupedPromos = Array.from(groupedPromosMap.values()).map(p => {
+    const days = p.all_days.filter(Boolean);
+    if (days.length === 7) {
+      p.display_day = "Everyday";
+    } else if (days.length > 1) {
+      // capitalize each day
+      p.display_day = days.map((d: string) => d.charAt(0).toUpperCase() + d.slice(1)).join(', ');
+    } else {
+      p.display_day = p.recurring_day;
+    }
+    return p;
+  });
+
   const tabCounts = {
     details: null, // No count needed
     events: upcomingEvents.length || null,
-    offers: promos.length || null,
+    offers: groupedPromos.length || null,
   };
 
   return (
@@ -315,23 +341,27 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
           {/* === OFFERS TAB === */}
           {activeTab === 'offers' && (
             <div className="space-y-3">
-              {promos.length === 0 ? (
+              {groupedPromos.length === 0 ? (
                 <div className="text-center py-8">
                   <Tag className="w-10 h-10 text-neutral-700 mx-auto mb-3" />
                   <p className="text-neutral-500 text-sm">No active offers right now.</p>
                   <p className="text-neutral-600 text-xs mt-1">Check back later for deals and specials!</p>
                 </div>
               ) : (
-                promos.map((promo) => (
+                groupedPromos.map((promo) => {
+                  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+                  const todayPromo = promos.find(orig => orig.discount_value === promo.discount_value && orig.recurring_day?.toLowerCase() === today);
+                  const activePromoId = todayPromo ? todayPromo.id : promo.id;
+                  return (
                   <details key={promo.id} className="group bg-neutral-800 border border-purple-500/30 rounded-xl overflow-hidden">
                     <summary className="list-none cursor-pointer bg-gradient-to-r from-purple-900/40 to-cyan-900/40 p-4 text-sm font-bold text-purple-300 hover:text-white transition-colors flex items-center justify-between outline-none">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span>🎁</span> {promo.discount_value}
                         </div>
-                        {promo.recurring_day && (
+                        {promo.display_day && (
                           <p className="text-[10px] text-neutral-500 mt-1 font-normal capitalize">
-                            Every {promo.recurring_day}
+                            {promo.display_day === 'Everyday' ? 'Everyday' : `Every ${promo.display_day}`}
                             {promo.active_from_time && promo.active_until_time 
                               ? ` · ${promo.active_from_time}–${promo.active_until_time}`
                               : ''}
@@ -339,7 +369,7 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                         )}
                         {promo.situation_tags && promo.situation_tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {promo.situation_tags.map(tag => {
+                            {promo.situation_tags.map((tag: string) => {
                               const cfg = getTagConfig(tag);
                               return (
                                 <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${cfg.bg} ${cfg.text}`}>
@@ -356,14 +386,15 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                     </summary>
                     <div className="p-4 bg-neutral-900/50 animate-in fade-in slide-in-from-top-2 duration-300">
                       <SecureQR 
-                        promotionId={promo.id}
+                        promotionId={activePromoId}
                         venueName={venue.name}
                         discountValue={promo.discount_value}
                         title={promo.title}
                       />
                     </div>
                   </details>
-                ))
+                );
+              })
               )}
             </div>
           )}
