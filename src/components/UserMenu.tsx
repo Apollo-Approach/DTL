@@ -45,8 +45,8 @@ export default function UserMenu({ user, profile }: { user: any, profile: any })
     <div 
       className="relative z-[100]" 
       ref={dropdownRef} 
-      onMouseEnter={() => setIsOpen(true)} 
-      onMouseLeave={() => setIsOpen(false)}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setIsOpen(true)} 
+      onPointerLeave={(e) => e.pointerType === 'mouse' && setIsOpen(false)}
     >
       <button 
         className={`w-11 h-11 bg-neutral-800 border ${isOpen ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'border-neutral-700'} hover:border-cyan-500 rounded-full flex items-center justify-center transition-all overflow-hidden shadow-lg`}
