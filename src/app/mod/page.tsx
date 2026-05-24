@@ -6,7 +6,7 @@ import { SafetyIncident } from '@/types';
 import { startShift, endShift, autoDispatch } from '@/app/actions/dispatch';
 import { useRouter } from 'next/navigation';
 import MapWrapper from '@/components/MapWrapper';
-
+import { getCurrentUserRole } from '@/app/actions/user';
 // M-Tier hierarchy for access control
 const M_TIER_ROLES = ['m1_observer', 'm2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'];
 const CAN_DISPATCH = ['m2_responder', 'm3_admin', 'm4_police', 'm5_sysadmin'];
@@ -81,18 +81,15 @@ export default function SafetyModDashboard() {
 
       setUserId(session.user.id);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
+      import { getCurrentUserRole } from '@/app/actions/user';
+      const role = await getCurrentUserRole(session.user.id);
 
-      if (!profile || !M_TIER_ROLES.includes(profile.role)) {
+      if (!role || !M_TIER_ROLES.includes(role)) {
         router.push('/');
         return;
       }
 
-      setUserRole(profile.role);
+      setUserRole(role);
       setAuthorized(true);
 
       // Check if user has an active shift
