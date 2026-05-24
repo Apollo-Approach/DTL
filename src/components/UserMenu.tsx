@@ -61,45 +61,47 @@ export default function UserMenu({ user, profile }: { user: any, profile: any })
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-4 border-b border-neutral-800 bg-neutral-800/30">
-            <p className="text-sm font-bold text-white truncate">
-              {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'User'}
-            </p>
-            <p className="text-xs text-neutral-400 mt-0.5 truncate">{user.email}</p>
-            <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-md">
-              Role: {role.replace(/_/g, ' ')}
-            </span>
-          </div>
+        <div className="absolute right-0 top-full pt-2 w-72 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-neutral-800 bg-neutral-800/30">
+              <p className="text-sm font-bold text-white truncate">
+                {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}` : 'User'}
+              </p>
+              <p className="text-xs text-neutral-400 mt-0.5 truncate">{user.email}</p>
+              <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-md">
+                Role: {role.replace(/_/g, ' ')}
+              </span>
+            </div>
 
-          <div className="p-2 space-y-1">
-            <Link href="/onboarding?next=/" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
-              <Settings className="w-4 h-4 text-neutral-400" /> Profile Settings
-            </Link>
+            <div className="p-2 space-y-1">
+              <Link href="/onboarding?next=/" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                <Settings className="w-4 h-4 text-neutral-400" /> Profile Settings
+              </Link>
 
-            {isAdmin && (
-              <>
-                <div className="h-px bg-neutral-800 my-2 mx-2"></div>
-                <div className="px-3 py-1.5 text-[10px] font-black text-neutral-500 uppercase tracking-widest">Admin Tools</div>
-                
-                <Link href="/admin/venues" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
-                  <MapPin className="w-4 h-4 text-cyan-400" /> Venue Manager
-                </Link>
-                
-                <Link href="/mod" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
-                  <Shield className="w-4 h-4 text-purple-400" /> Moderation Console
-                </Link>
-              </>
-            )}
+              {isAdmin && (
+                <>
+                  <div className="h-px bg-neutral-800 my-2 mx-2"></div>
+                  <div className="px-3 py-1.5 text-[10px] font-black text-neutral-500 uppercase tracking-widest">Admin Tools</div>
+                  
+                  <Link href="/admin/venues" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                    <MapPin className="w-4 h-4 text-cyan-400" /> Venue Manager
+                  </Link>
+                  
+                  <Link href="/mod" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                    <Shield className="w-4 h-4 text-purple-400" /> Moderation Console
+                  </Link>
+                </>
+              )}
 
-            <div className="h-px bg-neutral-800 my-2 mx-2"></div>
+              <div className="h-px bg-neutral-800 my-2 mx-2"></div>
 
-            <button 
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-xl transition-colors text-left"
-            >
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
+              <button 
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-xl transition-colors text-left"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
+            </div>
           </div>
         </div>
       )}
