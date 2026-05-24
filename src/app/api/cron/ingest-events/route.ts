@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import { fetchChurchEvents } from '@/lib/scrapers/churches';
@@ -76,6 +76,7 @@ interface NormalizedEvent {
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 60;
 
 /**
  * Generate a deterministic dedup hash for an event.
@@ -101,7 +102,7 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<NormalizedEvent[
     latlong: '42.9849,-81.2453',
     radius: '30',
     unit: 'km',
-    size: '50',
+    size: '200',
     sort: 'date,asc',
     startDateTime: new Date().toISOString().split('.')[0] + 'Z'
   });
@@ -374,43 +375,50 @@ async function fetchLMHEvents(): Promise<NormalizedEvent[]> {
   }
 }
 
-// ── Main cron handler ──
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
+
+  const sourceFilter = request.nextUrl.searchParams.get('source'); // e.g., 'ticketmaster', 'lmh', 'churches', 'eventbrite', 'grandtheatre'
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const results = {
-    ticketmaster: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
-    lmh: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
-    churches: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
-    eventbrite: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
-    grandtheatre: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
+  const results: Record<string, { fetched: number; inserted: number; skipped: number; errors: number; purged_ghosts: number }> = {
+    ticketmaster: { fetched: 0, inserted: 0, skipped: 0, errors: 0, purged_ghosts: 0 },
+    lmh: { fetched: 0, inserted: 0, skipped: 0, errors: 0, purged_ghosts: 0 },
+    churches: { fetched: 0, inserted: 0, skipped: 0, errors: 0, purged_ghosts: 0 },
+    eventbrite: { fetched: 0, inserted: 0, skipped: 0, errors: 0, purged_ghosts: 0 },
+    grandtheatre: { fetched: 0, inserted: 0, skipped: 0, errors: 0, purged_ghosts: 0 },
   };
 
   try {
-    // ── Fetch from all sources in parallel ──
     const apiKey = process.env.TICKETMASTER_API_KEY;
+    
+    // ── Conditionally fetch based on sourceFilter ──
+    const runTm = !sourceFilter || sourceFilter === 'ticketmaster';
+    const runLmh = !sourceFilter || sourceFilter === 'lmh';
+    const runChurches = !sourceFilter || sourceFilter === 'churches';
+    const runEb = !sourceFilter || sourceFilter === 'eventbrite';
+    const runGrand = !sourceFilter || sourceFilter === 'grandtheatre';
+
     const [tmEvents, lmhEvents, churchEvents, ebEvents, grandEvents] = await Promise.all([
-      apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
-      fetchLMHEvents(),
-      fetchChurchEvents(supabase),
-      fetchEventbriteEvents(),
-      fetchGrandTheatreEvents(supabase),
+      runTm && apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
+      runLmh ? fetchLMHEvents() : Promise.resolve([]),
+      runChurches ? fetchChurchEvents(supabase) : Promise.resolve([]),
+      runEb ? fetchEventbriteEvents() : Promise.resolve([]),
+      runGrand ? fetchGrandTheatreEvents(supabase) : Promise.resolve([]),
     ]);
 
-    results.ticketmaster.fetched = tmEvents.length;
-    results.lmh.fetched = lmhEvents.length;
-    results.churches.fetched = churchEvents.length;
-    results.eventbrite.fetched = ebEvents.length;
-    results.grandtheatre.fetched = grandEvents.length;
+    if (runTm) results.ticketmaster.fetched = tmEvents.length;
+    if (runLmh) results.lmh.fetched = lmhEvents.length;
+    if (runChurches) results.churches.fetched = churchEvents.length;
+    if (runEb) results.eventbrite.fetched = ebEvents.length;
+    if (runGrand) results.grandtheatre.fetched = grandEvents.length;
 
     const allEvents = [...tmEvents, ...lmhEvents, ...churchEvents, ...ebEvents, ...grandEvents];
 
@@ -452,7 +460,6 @@ export async function GET(request: Request) {
           );
 
         if (error) {
-          // Duplicate hash = already exists, which is fine
           if (error.code === '23505') {
             results[source].skipped++;
           } else {
@@ -467,6 +474,49 @@ export async function GET(request: Request) {
       }
     }
 
+    // ── Mirror Sync (Ghost Event Purge) ──
+    // For any source that ran, delete future events from the DB that were NOT in the newly fetched list.
+    const platformMapping: Record<string, { events: NormalizedEvent[], platformString: string }> = {
+      ticketmaster: { events: tmEvents, platformString: 'ticketmaster' },
+      lmh: { events: lmhEvents, platformString: 'lmh-wordpress' },
+      churches: { events: churchEvents, platformString: 'church-scraper' },
+      eventbrite: { events: ebEvents, platformString: 'eventbrite' },
+      grandtheatre: { events: grandEvents, platformString: 'grand-theatre-scraper' },
+    };
+
+    for (const [sourceKey, data] of Object.entries(platformMapping)) {
+      const shouldRun = (!sourceFilter || sourceFilter === sourceKey);
+      if (shouldRun && data.events.length > 0) {
+        const fetchedIds = data.events.map(e => e.id);
+        
+        // We only want to delete events in the FUTURE that are missing. Past events naturally age out.
+        const now = new Date().toISOString();
+        
+        // Fetch existing future events for this platform to see what needs deletion
+        const { data: existingEvents } = await supabase
+          .from('events')
+          .select('id')
+          .eq('source_platform', data.platformString)
+          .gte('end_time', now);
+          
+        if (existingEvents) {
+          const existingIds = existingEvents.map(e => e.id);
+          const idsToDelete = existingIds.filter(id => !fetchedIds.includes(id));
+          
+          if (idsToDelete.length > 0) {
+            console.log(`[Mirror Sync] Purging ${idsToDelete.length} ghost events for ${sourceKey}`);
+            // Supabase delete with IN array
+            const { count } = await supabase
+              .from('events')
+              .delete({ count: 'exact' })
+              .in('id', idsToDelete);
+              
+            results[sourceKey].purged_ghosts = count || 0;
+          }
+        }
+      }
+    }
+
     // ── Purge stale events (past events older than 24 hours) ──
     const yesterday = new Date(Date.now() - 24 * 3600000).toISOString();
     const { count: purged } = await supabase
@@ -478,15 +528,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
+      source_filter: sourceFilter || 'all',
       results,
-      total_ingested: tmEvents.length + lmhEvents.length + churchEvents.length + ebEvents.length + grandEvents.length,
-      total_persisted: results.ticketmaster.inserted + results.lmh.inserted + results.churches.inserted + results.eventbrite.inserted + results.grandtheatre.inserted,
       stale_purged: purged || 0,
     });
-
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Event Ingest] Fatal error:', message);
-    return NextResponse.json({ error: message, results }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Event Ingest] Fatal Cron Error:', error);
+    return new NextResponse(`Fatal Error: ${error.message}`, { status: 500 });
   }
 }

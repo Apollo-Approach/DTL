@@ -1,3 +1,25 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/ingest-events?source=ticketmaster",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-events?source=eventbrite",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-events?source=lmh",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-events?source=churches",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-events?source=grandtheatre",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }

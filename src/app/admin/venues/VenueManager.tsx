@@ -16,6 +16,7 @@ export interface Venue {
   lng?: number;
   image_url?: string;
   is_manually_curated?: boolean;
+  offerings?: any;
 }
 
 export default function VenueManager({ initialVenues }: { initialVenues: Venue[] }) {
@@ -50,7 +51,8 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
       lat: 42.9849, // Default to London ON
       lng: -81.2453,
       is_manually_curated: true,
-      image_url: ''
+      image_url: '',
+      offerings: {}
     });
     setIsModalOpen(true);
   };
@@ -91,12 +93,24 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     setIsSaving(true);
     
     try {
+      let parsedOfferings = editingVenue.offerings;
+      if (typeof editingVenue.offerings === 'string') {
+        try {
+          parsedOfferings = JSON.parse(editingVenue.offerings);
+        } catch (e) {
+          alert("Invalid JSON in Offerings field!");
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const payload: any = {
         name: editingVenue.name,
         description: editingVenue.description,
         type: editingVenue.type,
         image_url: editingVenue.image_url,
-        is_manually_curated: editingVenue.is_manually_curated
+        is_manually_curated: editingVenue.is_manually_curated,
+        offerings: parsedOfferings
       };
       
       if (editingVenue.lat !== undefined && editingVenue.lng !== undefined) {
@@ -280,6 +294,16 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                       value={editingVenue.description || ''}
                       onChange={e => setEditingVenue({...editingVenue, description: e.target.value})}
                       className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <label className="block text-xs font-bold text-neutral-400 mb-1">Offerings (JSON) — Editable Vibe & Specials</label>
+                    <textarea 
+                      placeholder='{"vibe_analysis": "Great place!", "daily_specials": []}'
+                      value={typeof editingVenue.offerings === 'string' ? editingVenue.offerings : JSON.stringify(editingVenue.offerings || {}, null, 2)}
+                      onChange={e => setEditingVenue({...editingVenue, offerings: e.target.value})}
+                      className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 font-mono text-xs h-40"
                     />
                   </div>
                   

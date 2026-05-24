@@ -211,9 +211,28 @@ def process_venues():
             pass
 
         # Optimization 1: Database-Level Filtering
-        logger.info("Querying Supabase for venues missing offerings...")
-        response = supabase.table("venues").select("id, name, website_url").eq("offerings", "{}").execute()
-        venues_to_process = response.data
+        logger.info("Querying Supabase for venues...")
+        import datetime
+        thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
+        
+        response = supabase.table("venues").select("id, name, website_url, offerings").execute()
+        
+        venues_to_process = []
+        for v in response.data:
+            offerings = v.get("offerings")
+            if not offerings or offerings == "{}":
+                venues_to_process.append(v)
+                continue
+                
+            if isinstance(offerings, dict) and "last_scraped_at" in offerings:
+                try:
+                    last_scraped = datetime.datetime.fromisoformat(offerings["last_scraped_at"])
+                    if last_scraped < thirty_days_ago:
+                        venues_to_process.append(v)
+                except ValueError:
+                    venues_to_process.append(v)
+            else:
+                venues_to_process.append(v)
                 
         logger.info(f"Found {len(venues_to_process)} venues needing enrichment.")
         
@@ -262,6 +281,8 @@ def process_venues():
                             reconcile_venue_location(supabase, venue_id, venue_name, maps_data)
                         
                         logger.info(f"Updating Supabase for {venue_name}...")
+                        import datetime
+                        offerings_json["last_scraped_at"] = datetime.datetime.now().isoformat()
                         supabase.table("venues").update({"offerings": offerings_json}).eq("id", venue_id).execute()
                         
                         # Check for Eventbrite Organizer ID
