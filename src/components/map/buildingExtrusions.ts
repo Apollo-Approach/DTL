@@ -492,11 +492,15 @@ export function destroyBuildingExtrusions(map: maplibregl.Map): void {
   state.matchedBuildings.clear();
   state.shimmerBuildings.clear();
 
-  if (!map) return;
+  if (!map || !map.getStyle()) return;
 
-  ['Building', 'Building top'].forEach(layerId => {
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', 'visible');
-    }
-  });
+  try {
+    ['Building', 'Building top'].forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', 'visible');
+      }
+    });
+  } catch (e) {
+    // Ignore errors during map teardown
+  }
 }
