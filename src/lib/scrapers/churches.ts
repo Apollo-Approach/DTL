@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface NormalizedEvent {
   id: string;
@@ -33,11 +34,76 @@ function generateId(prefix: string, seed: string): string {
   return `${prefix}-${createHash('sha256').update(seed).digest('hex').substring(0, 12)}`;
 }
 
-async function scrapeStPauls(): Promise<NormalizedEvent[]> {
+/**
+ * Fetches HTML and uses ETag + Content Hash caching to abort parsing if nothing changed.
+ * Returns the HTML string if parsing is needed, or null if the page hasn't changed.
+ */
+async function fetchWithCache(url: string, sourceId: string, supabase: SupabaseClient): Promise<string | null> {
   try {
-    const res = await fetch('https://www.stpaulscathedral.on.ca/events', { headers: { 'User-Agent': 'DTL-EventPipeline/2.0' } });
-    if (!res.ok) return [];
+    // 1. Get previous state
+    const { data: state } = await supabase
+      .from('scraper_state')
+      .select('etag, content_hash')
+      .eq('id', sourceId)
+      .single();
+
+    const headers: Record<string, string> = { 'User-Agent': 'DTL-EventPipeline/2.0' };
+    if (state?.etag) {
+      headers['If-None-Match'] = state.etag;
+    }
+
+    // 2. Fetch with ETag
+    const res = await fetch(url, { headers });
+    
+    if (res.status === 304) {
+      console.log(`[Cache] 304 Not Modified for ${sourceId}`);
+      return null; // No changes
+    }
+
+    if (!res.ok) return null;
+
     const html = await res.text();
+    const newEtag = res.headers.get('etag');
+
+    // 3. Compare Content Hash (Strip volatile tags)
+    const cleanHtml = html.replace(/<input[^>]*type="hidden"[^>]*>/gi, '').replace(/<time[^>]*>.*?<\/time>/gi, '');
+    const newHash = createHash('sha256').update(cleanHtml).digest('hex');
+
+    if (state?.content_hash === newHash) {
+      console.log(`[Cache] Content Hash matched for ${sourceId} (HTML changed but content did not)`);
+      // Update the timestamp and ETag anyway
+      await supabase.from('scraper_state').upsert({
+        id: sourceId,
+        etag: newEtag || state?.etag,
+        content_hash: newHash,
+        last_checked_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+      
+      return null; // Content identical
+    }
+
+    // 4. Content changed! Update state and return HTML
+    console.log(`[Cache] MISS for ${sourceId}. Parsing new HTML...`);
+    await supabase.from('scraper_state').upsert({
+      id: sourceId,
+      etag: newEtag,
+      content_hash: newHash,
+      last_checked_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    return html;
+
+  } catch (err) {
+    console.error(`Error in fetchWithCache for ${sourceId}:`, err);
+    return null;
+  }
+}
+
+async function scrapeStPauls(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
+  try {
+    const html = await fetchWithCache('https://www.stpaulscathedral.on.ca/events', 'stpauls', supabase);
+    if (!html) return [];
+    
     const $ = cheerio.load(html);
     const events: NormalizedEvent[] = [];
     
@@ -79,11 +145,11 @@ async function scrapeStPauls(): Promise<NormalizedEvent[]> {
   }
 }
 
-async function scrapeMetropolitan(): Promise<NormalizedEvent[]> {
+async function scrapeMetropolitan(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   try {
-    const res = await fetch('https://www.met-events-london.ca/all-events', { headers: { 'User-Agent': 'DTL-EventPipeline/2.0' } });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const html = await fetchWithCache('https://www.met-events-london.ca/all-events', 'metropolitan', supabase);
+    if (!html) return [];
+
     const $ = cheerio.load(html);
     const events: NormalizedEvent[] = [];
 
@@ -125,11 +191,11 @@ async function scrapeMetropolitan(): Promise<NormalizedEvent[]> {
   }
 }
 
-async function scrapeColborne(): Promise<NormalizedEvent[]> {
+async function scrapeColborne(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   try {
-    const res = await fetch('https://www.colborne711.org/colbornelive', { headers: { 'User-Agent': 'DTL-EventPipeline/2.0' } });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const html = await fetchWithCache('https://www.colborne711.org/colbornelive', 'colborne', supabase);
+    if (!html) return [];
+
     const $ = cheerio.load(html);
     const events: NormalizedEvent[] = [];
     const link = 'https://www.colborne711.org/colbornelive';
@@ -168,11 +234,11 @@ async function scrapeColborne(): Promise<NormalizedEvent[]> {
   }
 }
 
-async function scrapeDundas(): Promise<NormalizedEvent[]> {
+async function scrapeDundas(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   try {
-    const res = await fetch('https://www.lco-on.ca/tickets', { headers: { 'User-Agent': 'DTL-EventPipeline/2.0' } });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const html = await fetchWithCache('https://www.lco-on.ca/tickets', 'dundas', supabase);
+    if (!html) return [];
+
     const $ = cheerio.load(html);
     const events: NormalizedEvent[] = [];
     const link = 'https://www.lco-on.ca/tickets';
@@ -211,11 +277,11 @@ async function scrapeDundas(): Promise<NormalizedEvent[]> {
   }
 }
 
-async function scrapeFSA(): Promise<NormalizedEvent[]> {
+async function scrapeFSA(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   try {
-    const res = await fetch('https://fsaunited.com/events/', { headers: { 'User-Agent': 'DTL-EventPipeline/2.0' } });
-    if (!res.ok) return [];
-    const html = await res.text();
+    const html = await fetchWithCache('https://fsaunited.com/events/', 'fsa', supabase);
+    if (!html) return [];
+
     const $ = cheerio.load(html);
     const events: NormalizedEvent[] = [];
     const link = 'https://fsaunited.com/events/';
@@ -254,13 +320,13 @@ async function scrapeFSA(): Promise<NormalizedEvent[]> {
   }
 }
 
-export async function fetchChurchEvents(): Promise<NormalizedEvent[]> {
+export async function fetchChurchEvents(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   const [stpauls, met, colborne, dundas, fsa] = await Promise.all([
-    scrapeStPauls(),
-    scrapeMetropolitan(),
-    scrapeColborne(),
-    scrapeDundas(),
-    scrapeFSA()
+    scrapeStPauls(supabase),
+    scrapeMetropolitan(supabase),
+    scrapeColborne(supabase),
+    scrapeDundas(supabase),
+    scrapeFSA(supabase)
   ]);
   
   return [...stpauls, ...met, ...colborne, ...dundas, ...fsa];

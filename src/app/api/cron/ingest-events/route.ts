@@ -399,7 +399,7 @@ export async function GET(request: Request) {
     const [tmEvents, lmhEvents, churchEvents, ebEvents] = await Promise.all([
       apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
       fetchLMHEvents(),
-      fetchChurchEvents(),
+      fetchChurchEvents(supabase),
       fetchEventbriteEvents(),
     ]);
 
