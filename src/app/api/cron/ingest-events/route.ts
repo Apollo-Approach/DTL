@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
+import { fetchChurchEvents } from '@/lib/scrapers/churches';
 
 /**
  * Event Ingestion Cron — Sprint 2.1 + 2.2
@@ -387,24 +388,27 @@ export async function GET(request: Request) {
   const results = {
     ticketmaster: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
     lmh: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
+    churches: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
   };
 
   try {
     // ── Fetch from all sources in parallel ──
     const apiKey = process.env.TICKETMASTER_API_KEY;
-    const [tmEvents, lmhEvents] = await Promise.all([
+    const [tmEvents, lmhEvents, churchEvents] = await Promise.all([
       apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
       fetchLMHEvents(),
+      fetchChurchEvents(),
     ]);
 
     results.ticketmaster.fetched = tmEvents.length;
     results.lmh.fetched = lmhEvents.length;
+    results.churches.fetched = churchEvents.length;
 
-    const allEvents = [...tmEvents, ...lmhEvents];
+    const allEvents = [...tmEvents, ...lmhEvents, ...churchEvents];
 
     // ── Upsert each event (dedup by hash) ──
     for (const event of allEvents) {
-      const source = event.source_platform === 'ticketmaster' ? 'ticketmaster' : 'lmh';
+      const source = event.source_platform === 'ticketmaster' ? 'ticketmaster' : (event.source_platform === 'church-scraper' ? 'churches' : 'lmh');
 
       try {
         const { error } = await supabase
@@ -455,14 +459,14 @@ export async function GET(request: Request) {
       .from('events')
       .delete({ count: 'exact' })
       .lt('end_time', yesterday)
-      .in('source_platform', ['ticketmaster', 'lmh-wordpress']);
+      .in('source_platform', ['ticketmaster', 'lmh-wordpress', 'church-scraper']);
 
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       results,
-      total_ingested: tmEvents.length + lmhEvents.length,
-      total_persisted: results.ticketmaster.inserted + results.lmh.inserted,
+      total_ingested: tmEvents.length + lmhEvents.length + churchEvents.length,
+      total_persisted: results.ticketmaster.inserted + results.lmh.inserted + results.churches.inserted,
       stale_purged: purged || 0,
     });
 
