@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import { fetchChurchEvents } from '@/lib/scrapers/churches';
+import { fetchEventbriteEvents } from '@/lib/scrapers/eventbrite';
 
 /**
  * Event Ingestion Cron — Sprint 2.1 + 2.2
@@ -389,26 +390,33 @@ export async function GET(request: Request) {
     ticketmaster: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
     lmh: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
     churches: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
+    eventbrite: { fetched: 0, inserted: 0, skipped: 0, errors: 0 },
   };
 
   try {
     // ── Fetch from all sources in parallel ──
     const apiKey = process.env.TICKETMASTER_API_KEY;
-    const [tmEvents, lmhEvents, churchEvents] = await Promise.all([
+    const [tmEvents, lmhEvents, churchEvents, ebEvents] = await Promise.all([
       apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
       fetchLMHEvents(),
       fetchChurchEvents(),
+      fetchEventbriteEvents(),
     ]);
 
     results.ticketmaster.fetched = tmEvents.length;
     results.lmh.fetched = lmhEvents.length;
     results.churches.fetched = churchEvents.length;
+    results.eventbrite.fetched = ebEvents.length;
 
-    const allEvents = [...tmEvents, ...lmhEvents, ...churchEvents];
+    const allEvents = [...tmEvents, ...lmhEvents, ...churchEvents, ...ebEvents];
 
     // ── Upsert each event (dedup by hash) ──
     for (const event of allEvents) {
-      const source = event.source_platform === 'ticketmaster' ? 'ticketmaster' : (event.source_platform === 'church-scraper' ? 'churches' : 'lmh');
+      const source = event.source_platform === 'ticketmaster' 
+        ? 'ticketmaster' 
+        : (event.source_platform === 'church-scraper' 
+          ? 'churches' 
+          : (event.source_platform === 'eventbrite' ? 'eventbrite' : 'lmh'));
 
       try {
         const { error } = await supabase
@@ -459,14 +467,14 @@ export async function GET(request: Request) {
       .from('events')
       .delete({ count: 'exact' })
       .lt('end_time', yesterday)
-      .in('source_platform', ['ticketmaster', 'lmh-wordpress', 'church-scraper']);
+      .in('source_platform', ['ticketmaster', 'lmh-wordpress', 'church-scraper', 'eventbrite']);
 
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       results,
-      total_ingested: tmEvents.length + lmhEvents.length + churchEvents.length,
-      total_persisted: results.ticketmaster.inserted + results.lmh.inserted + results.churches.inserted,
+      total_ingested: tmEvents.length + lmhEvents.length + churchEvents.length + ebEvents.length,
+      total_persisted: results.ticketmaster.inserted + results.lmh.inserted + results.churches.inserted + results.eventbrite.inserted,
       stale_purged: purged || 0,
     });
 

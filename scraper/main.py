@@ -264,6 +264,19 @@ def process_venues():
                         logger.info(f"Updating Supabase for {venue_name}...")
                         supabase.table("venues").update({"offerings": offerings_json}).eq("id", venue_id).execute()
                         
+                        # Check for Eventbrite Organizer ID
+                        eb_id = offerings_json.get("eventbrite_organizer_id")
+                        if eb_id and str(eb_id).isdigit():
+                            logger.info(f"Discovered Eventbrite Organizer ID {eb_id} for {venue_name}")
+                            try:
+                                supabase.table("eventbrite_organizers").upsert({
+                                    "id": str(eb_id),
+                                    "name": venue_name,
+                                    "discovery_source": "llm_website_scraper"
+                                }, on_conflict="id").execute()
+                            except Exception as eb_e:
+                                logger.warning(f"Failed to upsert eventbrite organizer {eb_id}: {eb_e}")
+
                         # Extract daily_specials and insert into promotions table
                         daily_specials = offerings_json.get("daily_specials", [])
                         if daily_specials and isinstance(daily_specials, list):
