@@ -1,6 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import VenueManager from './VenueManager';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminVenuesPage() {
   const supabase = await createAdminClient();
   
