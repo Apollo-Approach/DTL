@@ -19,7 +19,7 @@ When we pull the London Open Data building outlines, we apply strict ray-casting
 
 - **Ray-Casting (Point-in-Polygon):** We first check if the venue pin is physically INSIDE the building boundary. If it is, the distance is exactly `0`. This solves the "massive building centroid" issue immediately.
 - **Distance to Edge:** If the pin is outside the footprint (e.g. on the sidewalk), we calculate the true geographic distance to the *closest edge* (line segment) of the polygon in meters, ignoring the centroid entirely.
-- **Strict Street Bounding (25m Max):** We enforce a hard cutoff of `25 meters` (roughly the width of a 4-lane street/boulevard). If the nearest building edge is more than 25 meters away, it is rejected entirely. This prevents the pin from jumping across the street (e.g. Budweiser Gardens).
+- **Strict Street Bounding (30m Max):** We enforce a hard cutoff of `30 meters`. If the nearest building edge is more than 30 meters away, it is rejected entirely. This prevents the pin from jumping across the street (e.g. Budweiser Gardens), while safely accounting for massive setback distances on large properties (e.g. St. Peter's Cathedral Basilica).
 
 ### 2. Feature Deduplication (`buildingExtrusions.ts`)
 To prevent MapLibre Z-fighting, the frontend dynamically deduplicates identical polygons before feeding them into the GeoJSON source:
