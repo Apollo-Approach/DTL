@@ -166,7 +166,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 /** Resolves a venue type string to its display category. */
 export function getVenueCategory(type: string | null | undefined): 'Nightlife' | 'Bars' | 'Eatery' | 'Stage' | 'Retail' {
-  const vType = type || '';
+  const vType = (type || '').toLowerCase();
   if ((VENUE_CATEGORIES.Nightlife as readonly string[]).includes(vType)) return 'Nightlife';
   if ((VENUE_CATEGORIES.Bars as readonly string[]).includes(vType)) return 'Bars';
   if ((VENUE_CATEGORIES.Eatery as readonly string[]).includes(vType)) return 'Eatery';

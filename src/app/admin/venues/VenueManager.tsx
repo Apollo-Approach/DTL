@@ -12,6 +12,7 @@ export interface Venue {
   name?: string;
   description?: string;
   type?: string;
+  address?: string;
   lat?: number;
   lng?: number;
   image_url?: string;
@@ -69,6 +70,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
       name: '',
       description: '',
       type: '',
+      address: '',
       lat: 42.9849, // Default to London ON
       lng: -81.2453,
       is_manually_curated: true,
@@ -129,6 +131,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         name: editingVenue.name,
         description: editingVenue.description,
         type: editingVenue.type,
+        address: editingVenue.address || '',
         image_url: editingVenue.image_url,
         is_manually_curated: editingVenue.is_manually_curated,
         offerings: parsedOfferings
@@ -321,6 +324,16 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                       placeholder="e.g. Bar, Club, Stage"
                       value={editingVenue.type || ''}
                       onChange={e => setEditingVenue({...editingVenue, type: e.target.value})}
+                      className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-400 mb-1">Address</label>
+                    <input 
+                      type="text"
+                      placeholder="e.g. 123 Dundas St"
+                      value={editingVenue.address || ''}
+                      onChange={e => setEditingVenue({...editingVenue, address: e.target.value})}
                       className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
                     />
                   </div>
