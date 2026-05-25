@@ -54,6 +54,7 @@ export default function ClientMapDebug({ venues }: ClientMapDebugProps) {
   const [showConstruction, setShowConstruction] = useState(false);
   const [showHQ, setShowHQ] = useState(true);
   const [showSafeWalk, setShowSafeWalk] = useState(false);
+  const [showBlueprint, setShowBlueprint] = useState(false);
   const [safeWalkTarget, setSafeWalkTarget] = useState<{ name: string } | null>(null);
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage', 'Nightlife']));
 
@@ -797,6 +798,44 @@ export default function ClientMapDebug({ venues }: ClientMapDebugProps) {
       'renew-york-wellington': [-81.2483, 42.9840],
     };
 
+    // ── Blueprint Toggle ──
+    useEffect(() => {
+      if (!mapInstance || !mapLoaded) return;
+      
+      const sourceId = 'blueprint-source';
+      const layerId = 'blueprint-layer';
+      
+      if (showBlueprint) {
+        if (!mapInstance.getSource(sourceId)) {
+          mapInstance.addSource(sourceId, {
+            type: 'image',
+            url: '/dtlmap.png',
+            coordinates: [
+              [-81.264, 42.990], // Top Left
+              [-81.238, 42.990], // Top Right
+              [-81.238, 42.975], // Bottom Right
+              [-81.264, 42.975]  // Bottom Left
+            ]
+          });
+        }
+        if (!mapInstance.getLayer(layerId)) {
+          // Find first symbol to place underneath text, or just top
+          mapInstance.addLayer({
+            id: layerId,
+            type: 'raster',
+            source: sourceId,
+            paint: {
+              'raster-opacity': 0.65,
+              'raster-fade-duration': 0
+            }
+          });
+        }
+      } else {
+        if (mapInstance.getLayer(layerId)) mapInstance.removeLayer(layerId);
+        if (mapInstance.getSource(sourceId)) mapInstance.removeSource(sourceId);
+      }
+    }, [mapInstance, mapLoaded, showBlueprint]);
+
     fetch('/api/civic/construction')
       .then(r => r.json())
       .then(data => {
@@ -1070,6 +1109,12 @@ export default function ClientMapDebug({ venues }: ClientMapDebugProps) {
                 <button onClick={() => setShowSafeWalk(!showSafeWalk)} className="flex flex-col items-center gap-1.5 min-w-[60px] shrink-0 snap-center">
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${showSafeWalk ? 'bg-teal-900/50 border-[3px] border-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>🛡️</div>
                   <span className={`text-[9px] font-bold uppercase tracking-wider ${showSafeWalk ? 'text-teal-400' : 'text-neutral-500'}`}>SafeWalk</span>
+                </button>
+
+                {/* Blueprint Calibration */}
+                <button onClick={() => setShowBlueprint(!showBlueprint)} className="flex flex-col items-center gap-1.5 min-w-[60px] shrink-0 snap-center">
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${showBlueprint ? 'bg-indigo-900/50 border-[3px] border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>🗺️</div>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider ${showBlueprint ? 'text-indigo-400' : 'text-neutral-500'}`}>Blueprint</span>
                 </button>
 
               </div>
