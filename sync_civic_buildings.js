@@ -18,27 +18,57 @@ function decodePostGISPoint(hexString) {
   } catch(e) { return null; }
 }
 
-function calculateCentroid(rings) {
-  let x = 0, y = 0, n = 0;
-  for (const ring of rings) {
-    for (const pt of ring) {
-      x += pt[0]; y += pt[1]; n++;
+// Ray-casting algorithm for point in polygon
+function pointInPolygon(pt, geom) {
+  let inside = false;
+  const x = pt[0], y = pt[1];
+  
+  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+  
+  for (const coordinates of polys) {
+    for (const ring of coordinates) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
     }
   }
-  return { x: x/n, y: y/n };
+  return inside;
 }
 
-function haversineDist(lat1, lon1, lat2, lon2) {
-  const R = 6371e3;
-  const p1 = lat1 * Math.PI/180;
-  const p2 = lat2 * Math.PI/180;
-  const dp = (lat2-lat1) * Math.PI/180;
-  const dl = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dp/2) * Math.sin(dp/2) +
-            Math.cos(p1) * Math.cos(p2) *
-            Math.sin(dl/2) * Math.sin(dl/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+// Distance from point to line segment in METERS
+function distToSegmentMeters(pt, v, w) {
+  // London, ON scale factors
+  const kx = 81400;  // meters per degree lon at lat 43
+  const ky = 111320; // meters per degree lat
+
+  const px = pt[0]*kx, py = pt[1]*ky;
+  const vx = v[0]*kx, vy = v[1]*ky;
+  const wx = w[0]*kx, wy = w[1]*ky;
+
+  const l2 = (vx - wx)**2 + (vy - wy)**2;
+  if (l2 === 0) return Math.sqrt((px - vx)**2 + (py - vy)**2);
+  let t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.sqrt((px - (vx + t * (wx - vx)))**2 + (py - (vy + t * (wy - vy)))**2);
+}
+
+// Distance to the closest edge of the polygon in METERS
+function distToPolygonEdgeMeters(pt, geom) {
+  let minDist = Infinity;
+  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
+
+  for (const coordinates of polys) {
+    for (const ring of coordinates) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const d = distToSegmentMeters(pt, ring[i], ring[i+1]);
+        if (d < minDist) minDist = d;
+      }
+    }
+  }
+  return minDist;
 }
 
 async function syncBuildings() {
@@ -69,41 +99,60 @@ async function syncBuildings() {
       const data = await res.json();
       
       if (data && data.features && data.features.length > 0) {
-        // Sort by geographic distance to the polygon centroid to pick the closest building
+        // Sort by edge distance instead of centroid distance
+        const pt = [dbCoords.lng, dbCoords.lat];
+        
         data.features.sort((a, b) => {
            let distA = Infinity;
            let distB = Infinity;
            
-           if (a.geometry && a.geometry.rings) {
-             const cA = calculateCentroid(a.geometry.rings);
-             distA = haversineDist(dbCoords.lat, dbCoords.lng, cA.y, cA.x);
+           if (a.geometry) {
+             if (pointInPolygon(pt, a.geometry)) {
+               distA = 0;
+             } else {
+               distA = distToPolygonEdgeMeters(pt, a.geometry);
+             }
            }
-           if (b.geometry && b.geometry.rings) {
-             const cB = calculateCentroid(b.geometry.rings);
-             distB = haversineDist(dbCoords.lat, dbCoords.lng, cB.y, cB.x);
+           if (b.geometry) {
+             if (pointInPolygon(pt, b.geometry)) {
+               distB = 0;
+             } else {
+               distB = distToPolygonEdgeMeters(pt, b.geometry);
+             }
            }
+           
+           // Store the distance in the feature for filtering below
+           a.properties._distToPin = distA;
+           b.properties._distToPin = distB;
            
            return distA - distB;
         });
         
-        // Take the closest intersecting building
-        let geom = data.features[0].geometry;
-        
-        // Add venue properties to the geojson feature
-        const feature = {
-          type: 'Feature',
-          geometry: geom,
-          properties: {
-            venue_id: venue.id,
-            name: venue.name,
-            type: venue.type,
-            hasSpecials: !!venue.late_night_eligible,
-            height: 10 // Default extrusion height, no HEIGHT property in Layer 3
-          }
-        };
-        
-        featureCollection.features.push(feature);
-        process.stdout.write('🏢');
+        const bestFeature = data.features[0];
+        // Only accept if the distance is 25 meters or less.
+        // This acts as the "street bounding logic" to prevent snapping to a building across the street!
+        if (bestFeature.properties._distToPin <= 25) {
+          let geom = bestFeature.geometry;
+
+          // Add venue properties to the geojson feature
+          const feature = {
+            type: 'Feature',
+            geometry: geom,
+            properties: {
+              venue_id: venue.id,
+              name: venue.name,
+              type: venue.type,
+              hasSpecials: !!venue.late_night_eligible,
+              height: 10 // Default extrusion height, no HEIGHT property in Layer 3
+            }
+          };
+
+          featureCollection.features.push(feature);
+          process.stdout.write('🏢');
+        } else {
+          // The closest building is too far away (e.g. across the street)
+          process.stdout.write('❌');
+        }
       } else {
         process.stdout.write('❌');
       }
