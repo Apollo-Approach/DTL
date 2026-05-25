@@ -158,7 +158,7 @@ export const VENUE_CATEGORIES = {
 
 export const CATEGORY_COLORS: Record<string, string> = {
   Nightlife: '#d946ef',
-  Bars: '#06b6d4',
+  Bars: '#a855f7',
   Eatery: '#f97316',
   Stage: '#eab308',
   Retail: '#64748b',

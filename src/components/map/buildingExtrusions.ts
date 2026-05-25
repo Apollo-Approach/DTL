@@ -8,7 +8,7 @@ import maplibregl from 'maplibre-gl';
 // --- Venue color palette matching BIA retail categories ---
 const VENUE_COLORS: Record<string, string> = {
   Nightlife: '#d946ef', // Fuchsia
-  Bars:      '#06b6d4', // Cyan
+  Bars:      '#a855f7', // Purple
   Eatery:    '#f97316', // Orange
   Stage:     '#eab308', // Yellow
   Retail:    '#64748b', // Slate
