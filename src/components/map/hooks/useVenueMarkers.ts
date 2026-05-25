@@ -64,16 +64,21 @@ export function useVenueMarkers(
       el.style.width = '28px';
       el.style.height = '28px';
 
-      if (isHQ) {
-        // Keep HQ marker or make it invisible? The request says "remove the icons". Let's make it invisible.
-        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
-      } else if (hasEvent || hasActiveSpecials) {
-        // Temporarily hide the event/promo icons
-        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
-      } else {
-        // Invisible marker to anchor the popup for building clicks
-        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
-      }
+      // Category-based emoji icon
+      const category = getVenueCategory(venue.type);
+      const categoryEmoji: Record<string, string> = {
+        Eatery: '🍴', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️',
+      };
+      let emoji = categoryEmoji[category] || '📍';
+      
+      if (isHQ) emoji = 'HQ';
+      else if (hasEvent) emoji = '🎟️';
+      else if (hasActiveSpecials) emoji = '$';
+
+      el.innerHTML = `
+        <div style="width:28px;height:28px;border-radius:50%;background:${isHQ ? '#22c55e' : markerColor};border:2px solid rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;font-size:${isHQ ? '10px' : '14px'};font-weight:bold;color:white;box-shadow:0 2px 8px ${isHQ ? '#22c55e' : markerColor}88;transition:transform 0.2s;">
+          ${emoji}
+        </div>`;
 
       const hqLinks = isHQ ? `<div style="margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px;"><a href="/about" style="display:block; margin-bottom: 4px; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">ℹ️ About & FAQ</a><a href="/contact" style="display:block; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">📞 Contact Us</a></div>` : '';
       const destUrl = todayEvent ? (sanitizeUrl(todayEvent.ticket_url) || sanitizeUrl(todayEvent.source_url) || `/venues/${todayEvent.venue_id}`) : '#';
