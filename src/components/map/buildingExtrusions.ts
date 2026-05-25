@@ -259,153 +259,13 @@ function suppressPOILabels(map: maplibregl.Map): void {
   });
 }
 
-// Helper: Ray-casting algorithm for point in polygon
-export function pointInPolygon(point: [number, number], polygon: number[][][]): boolean {
-  const x = point[0], y = point[1];
-  let inside = false;
-  
-  const ring = polygon[0];
-  if (!ring) return false;
+// --- 3. Match Venues to Civic Buildings ---
+let cachedCivicGeoJSON: GeoJSON.FeatureCollection | null = null;
 
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i][0], yi = ring[i][1];
-    const xj = ring[j][0], yj = ring[j][1];
-
-    const intersect = ((yi > y) !== (yj > y))
-        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  
-  return inside;
-}
-
-// Helper: Get minimum distance squared from a point to any vertex of a polygon
-export function distanceToPolygon(point: [number, number], polygon: number[][][]): number {
-  const ring = polygon[0];
-  if (!ring || ring.length === 0) return Infinity;
-  let minDistance = Infinity;
-  for (let i = 0; i < ring.length; i++) {
-    const dx = point[0] - ring[i][0];
-    const dy = point[1] - ring[i][1];
-    const dist = dx * dx + dy * dy;
-    if (dist < minDistance) {
-      minDistance = dist;
-    }
-  }
-  return minDistance;
-}
-
-// Helper: Extract a single Polygon from a feature that contains the given point
-export function extractSinglePolygon(
-  geometry: GeoJSON.Geometry, 
-  point: [number, number]
-): GeoJSON.Geometry {
-  if (geometry.type === 'Polygon') {
-    return geometry;
-  }
-  
-  if (geometry.type === 'GeometryCollection') {
-    for (const g of geometry.geometries) {
-      const extracted = extractSinglePolygon(g, point);
-      if (extracted.type === 'Polygon') return extracted;
-    }
-  }
-  
-  if (geometry.type === 'MultiPolygon') {
-    // 1. Try strict point-in-polygon first
-    for (const polygon of geometry.coordinates) {
-      if (pointInPolygon(point, polygon)) {
-        return { type: 'Polygon', coordinates: polygon };
-      }
-    }
-    
-    // 2. If point misses (e.g. on sidewalk), find the closest polygon by vertex distance
-    let bestPolygon = geometry.coordinates[0];
-    let minDistance = Infinity;
-    
-    for (const polygon of geometry.coordinates) {
-      const dist = distanceToPolygon(point, polygon);
-      if (dist < minDistance) {
-        minDistance = dist;
-        bestPolygon = polygon;
-      }
-    }
-    
-    if (bestPolygon) {
-      return { type: 'Polygon', coordinates: bestPolygon };
-    }
-  }
-  
-  // Fallback to the original geometry if we can't extract a Polygon
-  return geometry;
-}
-
-// Helper: Ray-casting math for line intersection
-export function ccw(A: [number, number], B: [number, number], C: [number, number]): boolean {
-  return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0]);
-}
-
-export function doLineSegmentsIntersect(
-  p1: [number, number], p2: [number, number],
-  p3: [number, number], p4: [number, number]
-): boolean {
-  return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
-}
-
-// Helper: Check if a line segment crosses a GeoJSON line/polygon feature
-export function segmentIntersectsFeature(
-  p1: [number, number],
-  p2: [number, number],
-  feature: GeoJSON.Feature
-): boolean {
-  if (!feature.geometry) return false;
-  
-  if (feature.geometry.type === 'LineString') {
-    const coords = feature.geometry.coordinates as [number, number][];
-    for (let i = 0; i < coords.length - 1; i++) {
-      if (doLineSegmentsIntersect(p1, p2, coords[i], coords[i + 1])) return true;
-    }
-  } else if (feature.geometry.type === 'MultiLineString') {
-    const lines = feature.geometry.coordinates as [number, number][][];
-    for (const line of lines) {
-      for (let i = 0; i < line.length - 1; i++) {
-        if (doLineSegmentsIntersect(p1, p2, line[i], line[i + 1])) return true;
-      }
-    }
-  } else if (feature.geometry.type === 'Polygon') {
-    const rings = feature.geometry.coordinates as [number, number][][];
-    for (const ring of rings) {
-      for (let i = 0; i < ring.length - 1; i++) {
-        if (doLineSegmentsIntersect(p1, p2, ring[i], ring[i + 1])) return true;
-      }
-    }
-  }
-  return false;
-}
-
-// Helper: Find the exact coordinate of the closest vertex on a polygon
-export function getClosestVertex(point: [number, number], polygon: number[][][]): [number, number] | null {
-  const ring = polygon[0];
-  if (!ring || ring.length === 0) return null;
-  let minDistance = Infinity;
-  let closest: [number, number] | null = null;
-  for (let i = 0; i < ring.length; i++) {
-    const dx = point[0] - ring[i][0];
-    const dy = point[1] - ring[i][1];
-    const dist = dx * dx + dy * dy;
-    if (dist < minDistance) {
-      minDistance = dist;
-      closest = [ring[i][0], ring[i][1]];
-    }
-  }
-  return closest;
-}
-
-// --- 3. Spatial Join: Match Venues to Building Polygons ---
-export function matchVenuesToBuildings(
+export async function matchVenuesToBuildings(
   map: maplibregl.Map,
   venues: Array<{ id: string; lng: number; lat: number; category: string; hasSpecials: boolean }>,
-): void {
+): Promise<void> {
   if (!map.getLayer('osm-3d-buildings')) return;
 
   // Clear previous matches and feature states
@@ -420,87 +280,49 @@ export function matchVenuesToBuildings(
   state.matchedBuildings.clear();
   state.shimmerBuildings.clear();
 
+  if (!cachedCivicGeoJSON) {
+    try {
+      const res = await fetch('/civic_data/civic_venue_buildings.geojson');
+      cachedCivicGeoJSON = await res.json();
+    } catch (err) {
+      console.error('Failed to load civic building footprints', err);
+      return;
+    }
+  }
+
   const buildingFeatures: GeoJSON.Feature[] = [];
   const glowFeatures: GeoJSON.Feature[] = [];
 
+  // Map the civic features by venue_id for quick lookup
+  const civicFeaturesByVenue = new Map<string, GeoJSON.Feature>();
+  if (cachedCivicGeoJSON?.features) {
+    for (const f of cachedCivicGeoJSON.features) {
+      if (f.properties?.venue_id) {
+        civicFeaturesByVenue.set(f.properties.venue_id, f);
+      }
+    }
+  }
+
   venues.forEach((venue) => {
     const color = VENUE_COLORS[venue.category] || VENUE_COLORS.default;
-    const point = map.project([venue.lng, venue.lat]);
+    const sourceFeature = civicFeaturesByVenue.get(venue.id);
 
-    // Create bounding box (30x30 px) for hit detection to catch venues slightly off building footprints
-    const HITBOX_BUFFER = 15;
-    const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
-      [point.x - HITBOX_BUFFER, point.y - HITBOX_BUFFER],
-      [point.x + HITBOX_BUFFER, point.y + HITBOX_BUFFER],
-    ];
+    if (sourceFeature) {
+      const customFeatureId = state.nextFeatureId++;
+      const renderHeight = sourceFeature.properties?.height || sourceFeature.properties?.HEIGHT || 10;
+      const renderBase = 0;
 
-    // Query ALL features in the bounding box to capture buildings AND road barriers
-    const allFeatures = map.queryRenderedFeatures(bbox);
-    
-    // Separate buildings from roads using sourceLayer to avoid brittle style ID dependencies
-    const features = allFeatures.filter(f => f.sourceLayer === 'building');
-    const roadFeatures = allFeatures.filter(f => {
-      if (f.sourceLayer !== 'transportation' && f.sourceLayer !== 'road') return false;
-      const rClass = f.properties?.class || '';
-      // Ignore pedestrian paths, service roads, and tracks from acting as barriers
-      if (['path', 'track', 'footway', 'pedestrian', 'service'].includes(rClass)) return false;
-      return true;
-    });
-
-    if (features.length > 0) {
-      let bestFeature = null;
-      let minGlobalDist = Infinity;
-      let bestExtractedPolygon = null;
-      let closestPolygonVertex: [number, number] | null = null;
-
-      for (const f of features) {
-        const poly = extractSinglePolygon(f.geometry, [venue.lng, venue.lat]);
-        if (poly.type === 'Polygon') {
-          const isInside = pointInPolygon([venue.lng, venue.lat], poly.coordinates);
-          const dist = isInside ? 0 : distanceToPolygon([venue.lng, venue.lat], poly.coordinates);
-          
-          if (dist < minGlobalDist) {
-            minGlobalDist = dist;
-            bestFeature = f;
-            bestExtractedPolygon = poly;
-            closestPolygonVertex = getClosestVertex([venue.lng, venue.lat], poly.coordinates);
-          }
+      const newFeature: GeoJSON.Feature = {
+        type: 'Feature',
+        id: customFeatureId,
+        geometry: sourceFeature.geometry,
+        properties: {
+          venueId: venue.id,
+          venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
+          venueHeight: renderHeight,
+          venueBase: renderBase,
         }
-      }
-
-      // Ray-Casting Barrier Check: Did we cross a street to reach this building?
-      let rayCrossedRoad = false;
-      if (closestPolygonVertex && minGlobalDist > 0) {
-        for (const road of roadFeatures) {
-          if (segmentIntersectsFeature([venue.lng, venue.lat], closestPolygonVertex, road)) {
-            rayCrossedRoad = true;
-            break;
-          }
-        }
-      }
-
-      // 0.0004 degrees is approx 44 meters. Squared: 1.6e-7
-      // If the closest building is further than this, it's likely across the street, so ignore it.
-      const MAX_DIST_SQ = 0.00000016;
-
-      if (bestFeature && bestExtractedPolygon && minGlobalDist <= MAX_DIST_SQ && !rayCrossedRoad) {
-        const sourceFeature = bestFeature;
-        const customFeatureId = state.nextFeatureId++;
-
-        const renderHeight = sourceFeature.properties?.render_height ?? 6;
-        const renderBase = sourceFeature.properties?.render_min_height ?? 0;
-
-        const newFeature: GeoJSON.Feature = {
-          type: 'Feature',
-          id: customFeatureId,
-          geometry: bestExtractedPolygon,
-          properties: {
-            venueId: venue.id,
-            venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
-            venueHeight: renderHeight,
-            venueBase: renderBase,
-          }
-        };
+      };
 
       buildingFeatures.push(newFeature);
 
@@ -517,16 +339,15 @@ export function matchVenuesToBuildings(
       if (venue.hasSpecials) {
         state.shimmerBuildings.add(customFeatureId);
       }
+    }
 
-      // Add glow point for this venue only if coloring is enabled
-      if (ENABLE_VENUE_COLORING) {
-        glowFeatures.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [venue.lng, venue.lat] },
-          properties: { color, venueId: venue.id },
-        });
-      }
-      }
+    // Always add glow point for venues (even if building missing)
+    if (ENABLE_VENUE_COLORING) {
+      glowFeatures.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [venue.lng, venue.lat] },
+        properties: { color, venueId: venue.id },
+      });
     }
   });
 
@@ -548,7 +369,7 @@ export function matchVenuesToBuildings(
     });
   }
 
-  console.log(`[3D Buildings] Matched ${state.matchedBuildings.size}/${venues.length} venues to building footprints`);
+  console.log(`[3D Buildings] Matched ${state.matchedBuildings.size}/${venues.length} venues to civic building footprints`);
 }
 
 // --- 4. Shimmer Animation Loop ---
@@ -600,6 +421,9 @@ export function setBuildingExtrusionsVisible(map: maplibregl.Map, visible: boole
   if (map.getLayer('venue-glow-halo')) {
     map.setLayoutProperty('venue-glow-halo', 'visibility', visible ? 'visible' : 'none');
   }
+  if (map.getLayer('osm-2d-building-outlines')) {
+    map.setLayoutProperty('osm-2d-building-outlines', 'visibility', visible ? 'visible' : 'none');
+  }
 }
 
 // --- 6. Cleanup ---
@@ -620,3 +444,4 @@ export function destroyBuildingExtrusions(map: maplibregl.Map): void {
     // Ignore errors during map teardown
   }
 }
+

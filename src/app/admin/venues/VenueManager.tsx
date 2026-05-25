@@ -38,8 +38,29 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     v.type?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const decodeWkbPoint = (wkbHex: string | undefined) => {
+    if (!wkbHex || typeof wkbHex !== 'string' || wkbHex.length < 42) return null;
+    const header = wkbHex.substring(0, 18);
+    if (header.toUpperCase() !== '0101000020E6100000') return null;
+    const xHex = wkbHex.substring(18, 34);
+    const yHex = wkbHex.substring(34, 50);
+    const parseLE = (hex: string) => {
+        const buffer = new ArrayBuffer(8);
+        const view = new DataView(buffer);
+        const bytes = hex.match(/.{2}/g)?.map(byte => parseInt(byte, 16)) || [];
+        bytes.forEach((b, i) => view.setUint8(i, b));
+        return view.getFloat64(0, true);
+    }
+    return { lng: parseLE(xHex), lat: parseLE(yHex) };
+  };
+
   const handleEdit = (venue: Venue) => {
-    setEditingVenue({ ...venue });
+    const coords = decodeWkbPoint((venue as any).location);
+    setEditingVenue({ 
+      ...venue,
+      lat: coords?.lat || 42.9849,
+      lng: coords?.lng || -81.2453
+    });
     setIsModalOpen(true);
   };
 
@@ -110,9 +131,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         type: editingVenue.type,
         image_url: editingVenue.image_url,
         is_manually_curated: editingVenue.is_manually_curated,
-        offerings: parsedOfferings,
-        lat: editingVenue.lat,
-        lng: editingVenue.lng
+        offerings: parsedOfferings
       };
       
       if (editingVenue.lat !== undefined && editingVenue.lng !== undefined) {

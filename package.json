@@ -17,6 +17,7 @@
     "@capacitor/geolocation": "^8.2.0",
     "@capacitor/local-notifications": "^8.2.0",
     "@capgo/background-geolocation": "^8.0.35",
+    "@google/genai": "^2.6.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "@turf/bearing": "^7.3.5",

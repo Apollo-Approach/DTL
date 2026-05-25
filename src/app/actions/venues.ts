@@ -22,6 +22,9 @@ export async function saveVenue(payload: any, venueId?: string) {
         revalidatePath('/', 'layout');
         return { success: true };
       } else {
+        if (!payload.id && payload.name) {
+          payload.id = 'v-' + payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000);
+        }
         const { data, error } = await adminSupabase
           .from('venues')
           .insert([payload])
