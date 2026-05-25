@@ -419,7 +419,13 @@ export function matchVenuesToBuildings(
     
     // Separate buildings from roads using sourceLayer to avoid brittle style ID dependencies
     const features = allFeatures.filter(f => f.sourceLayer === 'building');
-    const roadFeatures = allFeatures.filter(f => f.sourceLayer === 'transportation' || f.sourceLayer === 'road');
+    const roadFeatures = allFeatures.filter(f => {
+      if (f.sourceLayer !== 'transportation' && f.sourceLayer !== 'road') return false;
+      const rClass = f.properties?.class || '';
+      // Ignore pedestrian paths, service roads, and tracks from acting as barriers
+      if (['path', 'track', 'footway', 'pedestrian', 'service'].includes(rClass)) return false;
+      return true;
+    });
 
     if (features.length > 0) {
       let bestFeature = null;
