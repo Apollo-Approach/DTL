@@ -188,15 +188,15 @@ export async function GET(request: Request) {
       }
     }
 
-    // ── Prune old data (older than 14 days) ──
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    // ── Prune old data (older than 4 days) ──
+    const pruneDate = new Date();
+    pruneDate.setDate(pruneDate.getDate() - 4);
     
     // Fire and forget pruning (don't block the response)
     supabase
       .from('transit_delay_log')
       .delete()
-      .lt('recorded_at', fourteenDaysAgo.toISOString())
+      .lt('recorded_at', pruneDate.toISOString())
       .then(({ error: pruneError }) => {
         if (pruneError) console.error('[Transit Delay Logger] Prune error:', pruneError);
       });
