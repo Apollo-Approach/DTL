@@ -140,6 +140,26 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
     }, firstSymbolId);
   }
 
+  // Add a 2D line layer to heavily demarcate the venue footprints from above
+  if (!map.getLayer('osm-2d-building-outlines')) {
+    map.addLayer({
+      id: 'osm-2d-building-outlines',
+      type: 'line',
+      source: 'venue-buildings-source',
+      minzoom: 14.5,
+      paint: {
+        'line-color': [
+          'case',
+          ['!=', ['feature-state', 'venueColor'], null],
+          ['feature-state', 'venueColor'],
+          ['coalesce', ['get', 'venueColor'], '#ffffff']
+        ],
+        'line-width': 2,
+        'line-opacity': 1.0,
+      },
+    }, 'osm-3d-buildings');
+  }
+
   // --- Step E: Add the "Firefly" glow layer (flat circle beneath buildings) ---
   if (!map.getSource('venue-glow-source')) {
     map.addSource('venue-glow-source', {

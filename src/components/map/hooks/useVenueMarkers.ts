@@ -65,9 +65,11 @@ export function useVenueMarkers(
       el.style.height = '28px';
 
       if (isHQ) {
-        el.innerHTML = `<div style="color: #22c55e; font-weight: 900; font-size: 20px; text-shadow: 0 0 10px #22c55e; font-family: monospace;">HQ</div>`;
+        // Keep HQ marker or make it invisible? The request says "remove the icons". Let's make it invisible.
+        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
       } else if (hasEvent || hasActiveSpecials) {
-        el.innerHTML = `<div class="animate-bounce" style="color: #22c55e; font-weight: 900; font-size: 24px; text-shadow: 0 0 10px #22c55e;">${hasEvent ? '🎟️' : '$'}</div>`;
+        // Temporarily hide the event/promo icons
+        el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
       } else {
         // Invisible marker to anchor the popup for building clicks
         el.innerHTML = `<div style="opacity: 0; width: 10px; height: 10px;"></div>`;
