@@ -37,15 +37,23 @@ async function syncBuildings() {
     if (!dbCoords) continue;
 
     try {
-      // Spatial intersection query
-      const geometryParam = encodeURIComponent(`{"x":${dbCoords.lng},"y":${dbCoords.lat},"spatialReference":{"wkid":4326}}`);
-      const url = `https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query?geometry=${geometryParam}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=15&units=esriSRUnit_Meter&outFields=*&outSR=4326&f=geojson`;
+      // Create a small bounding box (~50m) around the coordinate
+      const d = 0.0005;
+      const geometryParam = encodeURIComponent(`{"xmin":${dbCoords.lng - d},"ymin":${dbCoords.lat - d},"xmax":${dbCoords.lng + d},"ymax":${dbCoords.lat + d},"spatialReference":{"wkid":4326}}`);
+      const url = `https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query?geometry=${geometryParam}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&f=geojson`;
       
       const res = await fetch(url);
       const data = await res.json();
       
       if (data && data.features && data.features.length > 0) {
-        // Take the first intersecting building
+        // Sort by area if available, to pick the most significant building in the bounding box
+        data.features.sort((a, b) => {
+           const areaA = a.properties['SHAPE.STArea()'] || 0;
+           const areaB = b.properties['SHAPE.STArea()'] || 0;
+           return areaB - areaA;
+        });
+        
+        // Take the largest intersecting building
         let geom = data.features[0].geometry;
         
         // Add venue properties to the geojson feature
