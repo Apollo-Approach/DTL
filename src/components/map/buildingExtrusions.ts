@@ -35,7 +35,7 @@ interface VenueMatch {
 }
 
 interface BuildingExtrusionState {
-  matchedBuildings: Map<number, VenueMatch>;
+  matchedBuildings: Map<number, VenueMatch[]>;
   shimmerBuildings: Set<number>;
   animationFrameId: number | null;
   nextFeatureId: number;
@@ -196,19 +196,23 @@ export function initBuildingExtrusions(map: maplibregl.Map, firstSymbolId?: stri
 
     for (const feature of e.features) {
       const featureId = feature.id as number;
-      const match = state.matchedBuildings.get(featureId);
-      if (!match || seen.has(match.venueId)) continue;
-      seen.add(match.venueId);
+      const matches = state.matchedBuildings.get(featureId);
+      if (!matches) continue;
+      
+      for (const match of matches) {
+        if (seen.has(match.venueId)) continue;
+        seen.add(match.venueId);
 
-      // Find the marker's screen position to calculate distance to click point
-      const markerEl = document.getElementById(`venue-marker-${match.venueId}`);
-      if (markerEl) {
-        const rect = markerEl.getBoundingClientRect();
-        const markerCenterX = rect.left + rect.width / 2;
-        const markerCenterY = rect.top + rect.height / 2;
-        const dx = e.originalEvent.clientX - markerCenterX;
-        const dy = e.originalEvent.clientY - markerCenterY;
-        candidates.push({ venueId: match.venueId, screenDist: dx * dx + dy * dy });
+        // Find the marker's screen position to calculate distance to click point
+        const markerEl = document.getElementById(`venue-marker-${match.venueId}`);
+        if (markerEl) {
+          const rect = markerEl.getBoundingClientRect();
+          const markerCenterX = rect.left + rect.width / 2;
+          const markerCenterY = rect.top + rect.height / 2;
+          const dx = e.originalEvent.clientX - markerCenterX;
+          const dy = e.originalEvent.clientY - markerCenterY;
+          candidates.push({ venueId: match.venueId, screenDist: dx * dx + dy * dy });
+        }
       }
     }
 
@@ -303,28 +307,37 @@ export async function matchVenuesToBuildings(
     }
   }
 
+  const geomHashes = new Map<string, number>();
+
   venues.forEach((venue) => {
     const color = VENUE_COLORS[venue.category] || VENUE_COLORS.default;
     const sourceFeature = civicFeaturesByVenue.get(venue.id);
 
-    if (sourceFeature) {
-      const customFeatureId = state.nextFeatureId++;
-      const renderHeight = sourceFeature.properties?.height || sourceFeature.properties?.HEIGHT || 10;
-      const renderBase = 0;
+    if (sourceFeature && sourceFeature.geometry) {
+      const hash = JSON.stringify(sourceFeature.geometry);
+      let customFeatureId = geomHashes.get(hash);
 
-      const newFeature: GeoJSON.Feature = {
-        type: 'Feature',
-        id: customFeatureId,
-        geometry: sourceFeature.geometry,
-        properties: {
-          venueId: venue.id,
-          venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
-          venueHeight: renderHeight,
-          venueBase: renderBase,
-        }
-      };
+      if (customFeatureId === undefined) {
+        customFeatureId = state.nextFeatureId++;
+        geomHashes.set(hash, customFeatureId);
 
-      buildingFeatures.push(newFeature);
+        const renderHeight = sourceFeature.properties?.height || sourceFeature.properties?.HEIGHT || 10;
+        const renderBase = 0;
+
+        const newFeature: GeoJSON.Feature = {
+          type: 'Feature',
+          id: customFeatureId,
+          geometry: sourceFeature.geometry,
+          properties: {
+            venueId: venue.id,
+            venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
+            venueHeight: renderHeight,
+            venueBase: renderBase,
+          }
+        };
+
+        buildingFeatures.push(newFeature);
+      }
 
       const match: VenueMatch = {
         venueId: venue.id,
@@ -334,7 +347,10 @@ export async function matchVenuesToBuildings(
         hasSpecials: venue.hasSpecials,
       };
 
-      state.matchedBuildings.set(customFeatureId, match);
+      if (!state.matchedBuildings.has(customFeatureId)) {
+        state.matchedBuildings.set(customFeatureId, []);
+      }
+      state.matchedBuildings.get(customFeatureId)!.push(match);
 
       if (venue.hasSpecials) {
         state.shimmerBuildings.add(customFeatureId);
@@ -385,10 +401,12 @@ export function startShimmerAnimation(map: maplibregl.Map): void {
     const t = (Math.sin(timestamp / 1500) + 1) / 2;
 
     state.shimmerBuildings.forEach((featureId) => {
-      const match = state.matchedBuildings.get(featureId);
-      if (!match) return;
+      const matches = state.matchedBuildings.get(featureId);
+      if (!matches || matches.length === 0) return;
 
-      const baseColor = ENABLE_VENUE_COLORING ? match.color : '#64748b';
+      // Use the color of the first match that has specials, or fallback to the first match
+      const activeMatch = matches.find(m => m.hasSpecials) || matches[0];
+      const baseColor = ENABLE_VENUE_COLORING ? activeMatch.color : '#64748b';
       const interpolatedColor = lerpColor(baseColor, SHIMMER_PEAK, t * 0.5);
 
       try {
