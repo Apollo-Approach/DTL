@@ -85,17 +85,6 @@ export default function MapFilterBar({
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Stage') ? 'text-yellow-400' : 'text-neutral-500'}`}>Stages</span>
               </button>
 
-              {/* Retail Bubble (multi-select) */}
-              <button 
-                onClick={() => toggleCategory('Retail')} 
-                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Retail') ? 'bg-teal-900/50 border-[3px] border-teal-400 shadow-[0_0_15px_rgba(45,212,191,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                  🛍️
-                </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Retail') ? 'text-teal-400' : 'text-neutral-500'}`}>Retail</span>
-              </button>
-
               {/* Events Sub-Filter Bubble — filters selected venue type to only those with events */}
               <button 
                 onClick={() => setLayerToggles(prev => ({ ...prev, events: !prev.events }))} 
