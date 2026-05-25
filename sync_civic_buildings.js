@@ -129,9 +129,9 @@ async function syncBuildings() {
         });
         
         const bestFeature = data.features[0];
-        // Only accept if the distance is 25 meters or less.
+        // Only accept if the distance is 30 meters or less.
         // This acts as the "street bounding logic" to prevent snapping to a building across the street!
-        if (bestFeature.properties._distToPin <= 25) {
+        if (bestFeature.properties._distToPin <= 30) {
           let geom = bestFeature.geometry;
 
           // Add venue properties to the geojson feature
