@@ -320,6 +320,67 @@ export function extractSinglePolygon(
   return geometry;
 }
 
+// Helper: Ray-casting math for line intersection
+export function ccw(A: [number, number], B: [number, number], C: [number, number]): boolean {
+  return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0]);
+}
+
+export function doLineSegmentsIntersect(
+  p1: [number, number], p2: [number, number],
+  p3: [number, number], p4: [number, number]
+): boolean {
+  return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+}
+
+// Helper: Check if a line segment crosses a GeoJSON line/polygon feature
+export function segmentIntersectsFeature(
+  p1: [number, number],
+  p2: [number, number],
+  feature: GeoJSON.Feature
+): boolean {
+  if (!feature.geometry) return false;
+  
+  if (feature.geometry.type === 'LineString') {
+    const coords = feature.geometry.coordinates as [number, number][];
+    for (let i = 0; i < coords.length - 1; i++) {
+      if (doLineSegmentsIntersect(p1, p2, coords[i], coords[i + 1])) return true;
+    }
+  } else if (feature.geometry.type === 'MultiLineString') {
+    const lines = feature.geometry.coordinates as [number, number][][];
+    for (const line of lines) {
+      for (let i = 0; i < line.length - 1; i++) {
+        if (doLineSegmentsIntersect(p1, p2, line[i], line[i + 1])) return true;
+      }
+    }
+  } else if (feature.geometry.type === 'Polygon') {
+    const rings = feature.geometry.coordinates as [number, number][][];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        if (doLineSegmentsIntersect(p1, p2, ring[i], ring[i + 1])) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Helper: Find the exact coordinate of the closest vertex on a polygon
+export function getClosestVertex(point: [number, number], polygon: number[][][]): [number, number] | null {
+  const ring = polygon[0];
+  if (!ring || ring.length === 0) return null;
+  let minDistance = Infinity;
+  let closest: [number, number] | null = null;
+  for (let i = 0; i < ring.length; i++) {
+    const dx = point[0] - ring[i][0];
+    const dy = point[1] - ring[i][1];
+    const dist = dx * dx + dy * dy;
+    if (dist < minDistance) {
+      minDistance = dist;
+      closest = [ring[i][0], ring[i][1]];
+    }
+  }
+  return closest;
+}
+
 // --- 3. Spatial Join: Match Venues to Building Polygons ---
 export function matchVenuesToBuildings(
   map: maplibregl.Map,
@@ -353,22 +414,18 @@ export function matchVenuesToBuildings(
       [point.x + HITBOX_BUFFER, point.y + HITBOX_BUFFER],
     ];
 
-    // Filter the layers array so MapLibre doesn't crash if a layer isn't in the style
-    const targetLayers = ['building-hitbox', 'Building', 'Building top']
-      .filter(layerId => map.getLayer(layerId));
-
-    if (targetLayers.length === 0) return;
-
-    // Query the invisible hitbox layer to find the building footprint
-    // Since we expanded the hitbox, we might hit multiple distinct features. We grab the closest one.
-    const features = map.queryRenderedFeatures(bbox, {
-      layers: targetLayers,
-    });
+    // Query ALL features in the bounding box to capture buildings AND road barriers
+    const allFeatures = map.queryRenderedFeatures(bbox);
+    
+    // Separate buildings from roads using sourceLayer to avoid brittle style ID dependencies
+    const features = allFeatures.filter(f => f.sourceLayer === 'building');
+    const roadFeatures = allFeatures.filter(f => f.sourceLayer === 'transportation' || f.sourceLayer === 'road');
 
     if (features.length > 0) {
       let bestFeature = null;
       let minGlobalDist = Infinity;
       let bestExtractedPolygon = null;
+      let closestPolygonVertex: [number, number] | null = null;
 
       for (const f of features) {
         const poly = extractSinglePolygon(f.geometry, [venue.lng, venue.lat]);
@@ -380,6 +437,18 @@ export function matchVenuesToBuildings(
             minGlobalDist = dist;
             bestFeature = f;
             bestExtractedPolygon = poly;
+            closestPolygonVertex = getClosestVertex([venue.lng, venue.lat], poly.coordinates);
+          }
+        }
+      }
+
+      // Ray-Casting Barrier Check: Did we cross a street to reach this building?
+      let rayCrossedRoad = false;
+      if (closestPolygonVertex && minGlobalDist > 0) {
+        for (const road of roadFeatures) {
+          if (segmentIntersectsFeature([venue.lng, venue.lat], closestPolygonVertex, road)) {
+            rayCrossedRoad = true;
+            break;
           }
         }
       }
@@ -388,7 +457,7 @@ export function matchVenuesToBuildings(
       // If the closest building is further than this, it's likely across the street, so ignore it.
       const MAX_DIST_SQ = 0.00000016;
 
-      if (bestFeature && bestExtractedPolygon && minGlobalDist <= MAX_DIST_SQ) {
+      if (bestFeature && bestExtractedPolygon && minGlobalDist <= MAX_DIST_SQ && !rayCrossedRoad) {
         const sourceFeature = bestFeature;
         const customFeatureId = state.nextFeatureId++;
 
