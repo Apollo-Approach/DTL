@@ -366,26 +366,46 @@ export function matchVenuesToBuildings(
     });
 
     if (features.length > 0) {
-      // If multiple features are returned, we should ideally check all of them, but extracting the closest polygon
-      // from the first feature (which MapLibre sorts by z-index/closest to center) is usually sufficient.
-      const sourceFeature = features[0];
-      const customFeatureId = state.nextFeatureId++;
+      let bestFeature = null;
+      let minGlobalDist = Infinity;
+      let bestExtractedPolygon = null;
 
-      const renderHeight = sourceFeature.properties?.render_height ?? 6;
-      const renderBase = sourceFeature.properties?.render_min_height ?? 0;
-
-      // Extract geometry from the rendered tile feature (filtering MultiPolygons if needed)
-      const newFeature: GeoJSON.Feature = {
-        type: 'Feature',
-        id: customFeatureId,
-        geometry: extractSinglePolygon(sourceFeature.geometry, [venue.lng, venue.lat]),
-        properties: {
-          venueId: venue.id,
-          venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
-          venueHeight: renderHeight,
-          venueBase: renderBase,
+      for (const f of features) {
+        const poly = extractSinglePolygon(f.geometry, [venue.lng, venue.lat]);
+        if (poly.type === 'Polygon') {
+          const isInside = pointInPolygon([venue.lng, venue.lat], poly.coordinates);
+          const dist = isInside ? 0 : distanceToPolygon([venue.lng, venue.lat], poly.coordinates);
+          
+          if (dist < minGlobalDist) {
+            minGlobalDist = dist;
+            bestFeature = f;
+            bestExtractedPolygon = poly;
+          }
         }
-      };
+      }
+
+      // 0.0004 degrees is approx 44 meters. Squared: 1.6e-7
+      // If the closest building is further than this, it's likely across the street, so ignore it.
+      const MAX_DIST_SQ = 0.00000016;
+
+      if (bestFeature && bestExtractedPolygon && minGlobalDist <= MAX_DIST_SQ) {
+        const sourceFeature = bestFeature;
+        const customFeatureId = state.nextFeatureId++;
+
+        const renderHeight = sourceFeature.properties?.render_height ?? 6;
+        const renderBase = sourceFeature.properties?.render_min_height ?? 0;
+
+        const newFeature: GeoJSON.Feature = {
+          type: 'Feature',
+          id: customFeatureId,
+          geometry: bestExtractedPolygon,
+          properties: {
+            venueId: venue.id,
+            venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',
+            venueHeight: renderHeight,
+            venueBase: renderBase,
+          }
+        };
 
       buildingFeatures.push(newFeature);
 
@@ -410,6 +430,7 @@ export function matchVenuesToBuildings(
           geometry: { type: 'Point', coordinates: [venue.lng, venue.lat] },
           properties: { color, venueId: venue.id },
         });
+      }
       }
     }
   });
