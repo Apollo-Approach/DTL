@@ -18,6 +18,29 @@ function decodePostGISPoint(hexString) {
   } catch(e) { return null; }
 }
 
+function calculateCentroid(rings) {
+  let x = 0, y = 0, n = 0;
+  for (const ring of rings) {
+    for (const pt of ring) {
+      x += pt[0]; y += pt[1]; n++;
+    }
+  }
+  return { x: x/n, y: y/n };
+}
+
+function haversineDist(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const p1 = lat1 * Math.PI/180;
+  const p2 = lat2 * Math.PI/180;
+  const dp = (lat2-lat1) * Math.PI/180;
+  const dl = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dp/2) * Math.sin(dp/2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(dl/2) * Math.sin(dl/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 async function syncBuildings() {
   console.log("Fetching venues from database...");
   const { data: venues, error } = await supabase.from('venues').select('id, name, type, late_night_eligible, location');
@@ -46,14 +69,24 @@ async function syncBuildings() {
       const data = await res.json();
       
       if (data && data.features && data.features.length > 0) {
-        // Sort by area if available, to pick the most significant building in the bounding box
+        // Sort by geographic distance to the polygon centroid to pick the closest building
         data.features.sort((a, b) => {
-           const areaA = a.properties['SHAPE.STArea()'] || 0;
-           const areaB = b.properties['SHAPE.STArea()'] || 0;
-           return areaB - areaA;
+           let distA = Infinity;
+           let distB = Infinity;
+           
+           if (a.geometry && a.geometry.rings) {
+             const cA = calculateCentroid(a.geometry.rings);
+             distA = haversineDist(dbCoords.lat, dbCoords.lng, cA.y, cA.x);
+           }
+           if (b.geometry && b.geometry.rings) {
+             const cB = calculateCentroid(b.geometry.rings);
+             distB = haversineDist(dbCoords.lat, dbCoords.lng, cB.y, cB.x);
+           }
+           
+           return distA - distB;
         });
         
-        // Take the largest intersecting building
+        // Take the closest intersecting building
         let geom = data.features[0].geometry;
         
         // Add venue properties to the geojson feature
