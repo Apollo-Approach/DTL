@@ -79,6 +79,8 @@ def synthesize_offerings(text_content, venue_name):
     prompt = f"""You are a deep-dive data extraction assistant. I will provide you with the raw text from the website and search results of a venue named '{venue_name}'.
 Your job is to read the text and extract hyper-specific, dynamic information into a strict JSON format. 
 
+CRITICAL: This venue is located in London, Ontario, Canada. You MUST ignore any events, specials, or news that are explicitly for other cities or franchise locations outside of London. If the text mentions multiple locations, only extract the details relevant to London.
+
 Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
 - "pricing_intel": [String describing specific prices found, e.g., "$5 Pints on Tuesdays" or "Cover charge $10". Leave empty if none]
