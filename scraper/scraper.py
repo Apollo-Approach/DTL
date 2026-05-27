@@ -31,8 +31,8 @@ def scrape_venue_data(venue_name, website_url, browser):
                 
                 homepage_text = page.locator("body").inner_text()
                 if len(homepage_text) > 50:
-                    aggregated_text += f"\n--- OFFICIAL WEBSITE (HOMEPAGE) ---\n{homepage_text[:2000]}\n"
-                    logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage (truncated to 2000).")
+                    aggregated_text += f"\n--- OFFICIAL WEBSITE (HOMEPAGE) ---\n{homepage_text[:5000]}\n"
+                    logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage (truncated to 5000).")
                 else:
                     logger.warning(f"Homepage returned suspiciously little text ({len(homepage_text)} chars).")
                 
@@ -75,8 +75,8 @@ def scrape_venue_data(venue_name, website_url, browser):
                             sub_text = sub_page.locator("body").inner_text()
                             
                             if len(sub_text) > 50:
-                                aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:2000]}\n"
-                                logger.info(f"Extracted {len(sub_text)} chars from sub-page (truncated to 2000).")
+                                aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:5000]}\n"
+                                logger.info(f"Extracted {len(sub_text)} chars from sub-page (truncated to 5000).")
                             
                             sub_page.close()
                             dives_completed += 1
@@ -101,8 +101,8 @@ def scrape_venue_data(venue_name, website_url, browser):
                         
                     homepage_text = soup.get_text(separator=' ', strip=True)
                     if len(homepage_text) > 50:
-                        aggregated_text += f"\n--- OFFICIAL WEBSITE (REQUESTS FALLBACK) ---\n{homepage_text[:2000]}\n"
-                        logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage via Requests fallback (truncated to 2000).")
+                        aggregated_text += f"\n--- OFFICIAL WEBSITE (REQUESTS FALLBACK) ---\n{homepage_text[:5000]}\n"
+                        logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage via Requests fallback (truncated to 5000).")
                         
                     target_keywords = ['events', 'calendar', 'live music', 'shows', 'menu', 'specials']
                     deep_dive_urls = set()
@@ -130,7 +130,7 @@ def scrape_venue_data(venue_name, website_url, browser):
                                     script.extract()
                                 sub_text = sub_soup.get_text(separator=' ', strip=True)
                                 if len(sub_text) > 50:
-                                    aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:2000]}\n"
+                                    aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:5000]}\n"
                                 dives_completed += 1
                                 gentle_sleep()
                             except Exception as sub_e:
@@ -156,7 +156,7 @@ def scrape_venue_data(venue_name, website_url, browser):
             page.goto(search_url, timeout=30000)
             page.wait_for_load_state("domcontentloaded")
             text = page.locator("body").inner_text()
-            aggregated_text += f"\n--- SEARCH RESULTS ---\n{text[:2000]}\n"
+            aggregated_text += f"\n--- SEARCH RESULTS ---\n{text[:5000]}\n"
             gentle_sleep()
         except Exception as e:
             logger.warning(f"Failed to scrape search engine for {venue_name}: {e}")
