@@ -69,17 +69,43 @@ def repair_json(raw: str) -> dict | None:
     return None
 
 
+def filter_irrelevant_locations(text: str) -> str:
+    """
+    Strips out paragraphs that clearly belong to other cities 
+    to prevent the LLM from hallucinating those events into London.
+    """
+    other_cities = ['toronto', 'ottawa', 'hamilton', 'mississauga', 'kitchener', 'waterloo', 'guelph', 'vancouver', 'calgary', 'edmonton', 'montreal', 'halifax', 'winnipeg', 'new york', 'chicago']
+    
+    paragraphs = text.split('\n')
+    filtered = []
+    for p in paragraphs:
+        p_lower = p.lower()
+        mentions_other = any(city in p_lower for city in other_cities)
+        mentions_london = 'london' in p_lower
+        
+        # If it mentions another city but NOT London, it's likely irrelevant location noise
+        if mentions_other and not mentions_london:
+            continue
+            
+        filtered.append(p)
+        
+    return '\n'.join(filtered)
+
 def synthesize_offerings(text_content, venue_name):
     if not text_content or len(text_content) < 50:
         logger.warning(f"Not enough text to synthesize for {venue_name} (Length: {len(text_content) if text_content else 0})")
         return {}
 
+    # Pre-filter the raw text to strip out blocks meant for other cities
+    text_content = filter_irrelevant_locations(text_content)
     text_content = text_content[:40000]
 
     prompt = f"""You are a deep-dive data extraction assistant. I will provide you with the raw text from the website and search results of a venue named '{venue_name}'.
 Your job is to read the text and extract hyper-specific, dynamic information into a strict JSON format. 
 
-CRITICAL: This venue is located in London, Ontario, Canada. You MUST ignore any events, specials, or news that are explicitly for other cities or franchise locations outside of London. If the text mentions multiple locations, only extract the details relevant to London.
+CRITICAL LOCALIZATION CONTEXT: This venue is exclusively located in London, Ontario, Canada.
+Focus entirely on extracting events, specials, and menu items that explicitly apply to the London, Ontario location or are brand-wide offerings. 
+Ensure all extracted data is strictly relevant to a customer visiting the London venue today.
 
 Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
