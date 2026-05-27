@@ -141,7 +141,7 @@ def scrape_venue_data(venue_name, website_url, browser):
                             cr_browser.close()
                         return fallback_text
                         
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(run_chromium_fallback)
                         aggregated_text += future.result()
                         
