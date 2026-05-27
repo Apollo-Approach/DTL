@@ -1,0 +1,2 @@
+wing: dtl_scraper
+description: Background pipeline for scraping and synthesizing venue metadata in Downtown London.

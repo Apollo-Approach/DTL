@@ -74,7 +74,7 @@ def synthesize_offerings(text_content, venue_name):
         logger.warning(f"Not enough text to synthesize for {venue_name} (Length: {len(text_content) if text_content else 0})")
         return {}
 
-    text_content = text_content[:8000]
+    text_content = text_content[:10000]
 
     prompt = f"""You are a deep-dive data extraction assistant. I will provide you with the raw text from the website and search results of a venue named '{venue_name}'.
 Your job is to read the text and extract hyper-specific, dynamic information into a strict JSON format. 
