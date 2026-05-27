@@ -156,9 +156,11 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-neutral-800 pb-2 mb-4 gap-4">
         <h2 className="text-xl md:text-2xl font-bold flex flex-wrap items-center gap-3">
           Nightly Offers
-          <span className="text-sm font-normal text-red-500/80">
-            Please Sign in and Enable Location Services to improve experience.
-          </span>
+          {!user && (
+            <span className="text-sm font-normal text-red-500/80">
+              Please Sign in and Enable Location Services to improve experience.
+            </span>
+          )}
         </h2>
 
         {preferences && (

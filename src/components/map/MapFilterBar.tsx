@@ -143,18 +143,6 @@ export default function MapFilterBar({
             <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
           </button>
 
-          {/* Search Bubble */}
-          <button 
-            onClick={() => setIsSearchActive(true)} 
-            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-          >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 bg-slate-900/50 border-[3px] border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.5)]`}>
-              🔍
-            </div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider text-slate-400`}>Search</span>
-          </button>
-
-
           {/* Mod Pins Bubble (Visible to all M-Tiers) */}
           {userRole.startsWith('m') && (
             <button 
@@ -167,6 +155,18 @@ export default function MapFilterBar({
               <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.incidents ? 'text-red-400' : 'text-neutral-500'}`}>Alerts</span>
             </button>
           )}
+
+          {/* Search Bubble */}
+          <button 
+            onClick={() => setIsSearchActive(true)} 
+            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 bg-slate-900/50 border-[3px] border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.5)]`}>
+              🔍
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-wider text-slate-400`}>Search</span>
+          </button>
+
 
           </div>
         </div>
