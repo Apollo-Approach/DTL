@@ -361,6 +361,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
             venues={venues} 
             mapRef={mapRef} 
             onClose={() => setIsSearchActive(false)} 
+            isActive={isSearchActive}
           />
         }
       />

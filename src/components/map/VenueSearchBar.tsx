@@ -6,13 +6,21 @@ interface VenueSearchBarProps {
   venues: Venue[];
   mapRef: React.RefObject<any>; // maplibregl.Map
   onClose: () => void;
+  isActive?: boolean;
 }
 
-export default function VenueSearchBar({ venues, mapRef, onClose }: VenueSearchBarProps) {
+export default function VenueSearchBar({ venues, mapRef, onClose, isActive }: VenueSearchBarProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Venue[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isActive]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -61,12 +69,12 @@ export default function VenueSearchBar({ venues, mapRef, onClose }: VenueSearchB
       <div className="relative flex items-center w-full">
         <span className="absolute left-3 text-neutral-400">🔍</span>
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
           placeholder="Search venues..."
-          autoFocus
           className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all placeholder:text-neutral-500"
         />
         {/* We always show the close button to close the search mode completely */}

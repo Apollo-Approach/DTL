@@ -155,7 +155,17 @@ export function useVenueMarkers(
         if (!marker.getPopup().isOpen()) {
           marker.togglePopup();
         }
-        map.flyTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 16), speed: 1.2 });
+        map.flyTo({ center: marker.getLngLat(), zoom: Math.max(map.getZoom(), 17), speed: 1.5 });
+        
+        // Add pulse animation
+        const el = marker.getElement();
+        const innerDiv = el.firstElementChild as HTMLElement;
+        if (innerDiv) {
+          innerDiv.classList.add('animate-marker-pulse');
+          setTimeout(() => {
+            if (innerDiv) innerDiv.classList.remove('animate-marker-pulse');
+          }, 3000);
+        }
       }
     };
     window.addEventListener('open-venue-popup', handleOpenPopup);
