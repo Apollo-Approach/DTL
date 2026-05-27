@@ -14,7 +14,7 @@ import { initBuildingExtrusions, matchVenuesToBuildings, startShimmerAnimation, 
 import { useVenueMarkers } from './map/hooks/useVenueMarkers';
 import { useEventMarkers } from './map/hooks/useEventMarkers';
 import { useIncidentMarkers } from './map/hooks/useIncidentMarkers';
-import { useConstructionMarkers } from './map/hooks/useConstructionMarkers';
+
 import { useMapInit } from './map/hooks/useMapInit';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
@@ -74,12 +74,9 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     retail: false,
     parking: false,
     events: true,
-    specials: false,
-    construction: false
+    specials: false
   });
 
-  // Construction advisory data
-  const [constructionProjects, setConstructionProjects] = useState<{id: string; title: string; description: string; impacts: string[]; location: string; source: string}[]>([]);
 
   // Transit route alerts (route_id → alert summaries)
   const routeAlertsRef = useRef<Record<string, string[]>>({});
@@ -169,7 +166,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
     mapRef,
     busStateRef,
     routeAlertsRef,
-    setConstructionProjects,
+
     pinModeRef,
     setIsPinMode,
     setPendingPinLocation,
@@ -180,7 +177,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   useVenueMarkers(mapRef, venues, promos, events, '', forYou, preferences, activeCategories, false);
   useEventMarkers(mapRef, events, '', '', layerToggles, preferences);
   useIncidentMarkers(mapRef, incidents, localIncidentUpdates, layerToggles, userRole, timeFilter, mode, setSelectedIncident);
-  useConstructionMarkers(mapRef, constructionProjects, layerToggles);
+
 
 
   useEffect(() => {

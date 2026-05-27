@@ -14,8 +14,7 @@ interface UseMapInitProps {
   mapRef: MutableRefObject<maplibregl.Map | null>;
   busStateRef: MutableRefObject<Record<string, BusState>>;
   routeAlertsRef: MutableRefObject<Record<string, string[]>>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  setConstructionProjects: React.Dispatch<React.SetStateAction<any[]>>;
+
   pinModeRef: MutableRefObject<boolean>;
   setIsPinMode: React.Dispatch<React.SetStateAction<boolean>>;
   setPendingPinLocation: React.Dispatch<React.SetStateAction<{lng: number, lat: number} | null>>;
@@ -28,7 +27,7 @@ export function useMapInit({
   mapRef,
   busStateRef,
   routeAlertsRef,
-  setConstructionProjects,
+
   pinModeRef,
   setIsPinMode,
   setPendingPinLocation,
@@ -758,21 +757,6 @@ export function useMapInit({
           )
           .addTo(map);
 
-        // --- CONSTRUCTION ADVISORY DATA FETCH ---
-        const fetchConstruction = async () => {
-          try {
-            const res = await fetch('/api/civic/construction');
-            if (res.ok) {
-              const data = await res.json();
-              setConstructionProjects(data.projects || []);
-            }
-          } catch (err) {
-            console.error('Construction fetch error:', err);
-          }
-        };
-        fetchConstruction();
-        // Refresh construction data every 5 minutes
-        const constructionInterval = setInterval(fetchConstruction, 300000);
 
         // Load route shapes once into memory for comet calculations
         fetch('/civic_data/ltc_shapes.geojson')
@@ -789,7 +773,7 @@ export function useMapInit({
         // Cleanup
         map.on('remove', () => {
           clearInterval(civicInterval);
-          clearInterval(constructionInterval);
+
           if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
           stopShimmerAnimation();
           destroyBuildingExtrusions(map);
