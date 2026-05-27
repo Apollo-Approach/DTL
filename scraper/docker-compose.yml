@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    shm_size: '2gb'
     volumes:
       - ./data:/app/data
 
@@ -18,5 +19,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    shm_size: '2gb'
     environment:
       - EVENT_CYCLE_HOURS=6
