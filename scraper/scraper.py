@@ -19,6 +19,9 @@ def scrape_venue_data(venue_name, website_url, browser):
     try:
         # Open a new tab instead of booting a whole new browser
         page = browser.new_page()
+        # Inject anti-crash error suppressors before any navigation occurs
+        page.add_init_script("window.addEventListener('error', function(e) { e.stopImmediatePropagation(); }, true);")
+        page.add_init_script("window.addEventListener('unhandledrejection', function(e) { e.stopImmediatePropagation(); }, true);")
 
         if website_url:
             logger.info(f"Visiting official site via Camoufox: {website_url}")
@@ -64,6 +67,9 @@ def scrape_venue_data(venue_name, website_url, browser):
                         
                         try:
                             sub_page = browser.new_page()
+                            sub_page.add_init_script("window.addEventListener('error', function(e) { e.stopImmediatePropagation(); }, true);")
+                            sub_page.add_init_script("window.addEventListener('unhandledrejection', function(e) { e.stopImmediatePropagation(); }, true);")
+                            
                             sub_page.goto(absolute_url, timeout=20000)
                             sub_page.wait_for_load_state("domcontentloaded")
                             sub_text = sub_page.locator("body").inner_text()
@@ -100,7 +106,10 @@ def scrape_venue_data(venue_name, website_url, browser):
                     raise BrowserDeadError(str(e))
 
         # Close the page and open a fresh one to prevent "navigation interrupted" errors if the previous site hung
-        page.close()
+        try:
+            page.close()
+        except Exception:
+            pass
         page = browser.new_page()
 
         search_url = f"https://duckduckgo.com/?q={venue_name.replace(' ', '+')}+london+ontario+reviews"
