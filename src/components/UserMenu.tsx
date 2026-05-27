@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { User, Settings, Shield, MapPin, LogOut } from 'lucide-react';
+import { User, Settings, Shield, MapPin, LogOut, Map, Activity, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -90,6 +90,22 @@ export default function UserMenu({ user, profile }: { user: any, profile: any })
                   <Link href="/mod" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
                     <Shield className="w-4 h-4 text-purple-400" /> Moderation Console
                   </Link>
+                  
+                  {role === 'm5_sysadmin' && (
+                    <>
+                      <Link href="/admin/dashboard" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                        <Activity className="w-4 h-4 text-emerald-400" /> Civic Dashboard
+                      </Link>
+                      
+                      <Link href="/map-debug" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                        <Map className="w-4 h-4 text-yellow-400" /> Map Debugger
+                      </Link>
+                      
+                      <Link href="/crisis" className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors">
+                        <AlertTriangle className="w-4 h-4 text-red-500" /> Crisis Override
+                      </Link>
+                    </>
+                  )}
                 </>
               )}
 
