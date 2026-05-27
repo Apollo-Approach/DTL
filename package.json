@@ -35,6 +35,7 @@
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
+    "framer-motion": "^12.40.0",
     "got-scraping": "^4.2.1",
     "gtfs-realtime-bindings": "^2.0.0",
     "ioredis": "^5.11.0",

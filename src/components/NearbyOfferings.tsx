@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import VenueDetailModal from '@/components/VenueDetailModal';
 
 import { Venue, Promotion, Event, Preferences } from '@/types';
@@ -237,16 +238,26 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
             const tags = venue.situation_tags || [];
             
             return (
-              <li 
-                key={`${venue.id}-${shuffleSeed}`} 
+              <motion.li 
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ 
+                  opacity: isShuffling ? 0.3 : 1, 
+                  filter: isShuffling ? 'blur(4px)' : 'blur(0px)',
+                  scale: isShuffling ? 0.95 : 1,
+                  y: 0
+                }}
+                transition={{ duration: 0.3 }}
+                whileHover={{ scale: 1.02 }}
+                key={venue.id} 
                 onClick={() => setSelectedVenue(venue)}
-                className={`min-w-[300px] shrink-0 snap-center p-5 bg-neutral-900 border animate-in fade-in slide-in-from-bottom-4 duration-300 ${
+                className={`min-w-[300px] shrink-0 snap-center p-5 bg-neutral-900 border ${
                   forYou && (venue.matchScore ?? 0) >= 80 
                     ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
                     : isPopUp 
                       ? 'border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.1)]' 
                       : 'border-neutral-800'
-                } rounded-xl hover:border-purple-500 transition-all hover:scale-[1.02] cursor-pointer relative overflow-hidden flex flex-col group`}
+                } rounded-xl hover:border-purple-500 transition-colors cursor-pointer relative overflow-hidden flex flex-col group`}
               >
                 <article className="flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-1">
@@ -307,7 +318,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
                     </div>
                   </div>
                 </article>
-              </li>
+              </motion.li>
             );
           })}
         </ul>
