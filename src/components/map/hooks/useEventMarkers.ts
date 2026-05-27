@@ -51,13 +51,17 @@ export function useEventMarkers(
     // Cluster events by venue proximity (~200m)
     const clusters: EventCluster[] = [];
     filteredEvents.forEach((evt) => {
-      const existing = clusters.find(c =>
-        Math.abs(c.lat - evt.lat) < 0.002 && Math.abs(c.lng - evt.lng) < 0.002
+      const lat = evt.lat || 0;
+      const lng = evt.lng || 0;
+
+      const cluster = clusters.find(c => 
+        Math.abs(c.lat - lat) < 0.002 && Math.abs(c.lng - lng) < 0.002
       );
-      if (existing) {
-        existing.events.push(evt);
+
+      if (cluster) {
+        cluster.events.push(evt);
       } else {
-        clusters.push({ lat: evt.lat, lng: evt.lng, venueName: evt.name, events: [evt] });
+        clusters.push({ lat, lng, venueName: evt.name, events: [evt] });
       }
     });
 

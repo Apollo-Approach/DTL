@@ -1,0 +1,29 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - default
+
+  aggregator:
+    build: .
+    restart: always
+    env_file:
+      - .env.local
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+    command: ["npx", "tsx", "src/scripts/startWorker.ts"]
+    networks:
+      - default
+
+volumes:
+  redis_data:
+
+networks:
+  default:

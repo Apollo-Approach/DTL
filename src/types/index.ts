@@ -32,25 +32,27 @@ export const VenueSchema = z.object({
   situation_tags: z.array(z.string()).optional(),
 });
 
-export const EventSchema = z.object({
-  id: z.string(),
+export const NormalizedEventSchema = z.object({
+  id: z.string(), // Internal UUID
   name: z.string(),
-  venue_id: z.string(),
-  start_time: z.string().datetime(), // ISO 8601
-  end_time: z.string().datetime(), // ISO 8601
+  venue_id: z.string().nullable().optional(),
+  start_time: z.string().datetime(), // ISO 8601 UTC
+  end_time: z.string().datetime().optional(), // ISO 8601 UTC
   is_free: z.boolean(),
-  price: z.number(),
+  price: z.number().optional(),
   categories: z.array(z.string()),
-  description: z.string(),
+  description: z.string().optional(),
   ticket_url: z.string().nullable().optional(),
-  source_platform: z.string().nullable().optional(),
+  source_platform: z.string(),
   source_url: z.string().nullable().optional(),
   image_url: z.string().nullable().optional(),
   age_restriction: z.string().nullable().optional(),
   door_time: z.string().nullable().optional(),
   venue_subroom: z.string().nullable().optional(),
-  lat: z.number(),
-  lng: z.number()
+  dedup_hash: z.string().optional(),
+  location: z.string().optional(), // PostGIS POINT WKT
+  lat: z.number().optional(), // Sometimes present on client
+  lng: z.number().optional()  // Sometimes present on client
 });
 
 export enum IncidentType {
@@ -88,7 +90,8 @@ export const SafetyIncidentSchema = z.object({
 
 export type GeoJSONPoint = z.infer<typeof GeoJSONPointSchema>;
 export type Venue = z.infer<typeof VenueSchema>;
-export type Event = z.infer<typeof EventSchema>;
+export type NormalizedEvent = z.infer<typeof NormalizedEventSchema>;
+export type Event = NormalizedEvent; // Alias for frontend compatibility
 export type SafetyIncident = z.infer<typeof SafetyIncidentSchema>;
 
 export enum MediaPlatform {

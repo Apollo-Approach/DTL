@@ -23,6 +23,9 @@ interface MapFilterBarProps {
   preferences: Preferences | null;
   mode: 'public' | 'crisis';
   userRole?: string;
+  isSearchActive: boolean;
+  setIsSearchActive: React.Dispatch<React.SetStateAction<boolean>>;
+  searchBarComponent?: React.ReactNode;
 }
 
 export default function MapFilterBar({
@@ -31,6 +34,7 @@ export default function MapFilterBar({
   forYou, setForYou,
   preferences, mode,
   userRole = 'citizen',
+  isSearchActive, setIsSearchActive, searchBarComponent
 }: MapFilterBarProps) {
 
   return (
@@ -40,8 +44,15 @@ export default function MapFilterBar({
         <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
         
         {/* Wrapper for mask fade-out effect */}
-        <div className="relative w-full [mask-image:linear-gradient(to_right,transparent_0%,black_5%,black_95%,transparent_100%)]">
-          <div className="flex overflow-x-auto flex-nowrap gap-3 pb-4 px-4 snap-x snap-mandatory scrollbar-hide items-start">
+        <div className="relative w-full [mask-image:linear-gradient(to_right,transparent_0%,black_5%,black_95%,transparent_100%)] h-[84px]">
+          
+          {/* SEARCH BAR OVERLAY */}
+          <div className={`absolute inset-0 px-4 z-20 flex items-start pt-1 transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8 pointer-events-none'}`}>
+            {searchBarComponent}
+          </div>
+
+          {/* BUBBLES TRACK */}
+          <div className={`absolute inset-0 flex overflow-x-auto flex-nowrap gap-3 pb-4 px-4 snap-x snap-mandatory scrollbar-hide items-start transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 -translate-x-8 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
             
           {/* Marketing Bubbles (Hidden for M-Tier Mods to reduce cognitive load) */}
           {!userRole.startsWith('m') && (
@@ -130,6 +141,17 @@ export default function MapFilterBar({
               🚌
             </div>
             <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.transit ? 'text-emerald-400' : 'text-neutral-500'}`}>Transit</span>
+          </button>
+
+          {/* Search Bubble */}
+          <button 
+            onClick={() => setIsSearchActive(true)} 
+            className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 bg-slate-900/50 border-[3px] border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.5)]`}>
+              🔍
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-wider text-slate-400`}>Search</span>
           </button>
 
 

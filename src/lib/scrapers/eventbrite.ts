@@ -1,27 +1,16 @@
 import { createHash } from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import * as cheerio from 'cheerio';
+import { NormalizedEvent } from '../../types';
+import { matchEventToVenue } from './venueMatcher';
 
-// The NormalizedEvent interface should be identical to the one in churches.ts or route.ts
-export interface NormalizedEvent {
-  id: string;
-  name: string;
-  venue_id: string | null;
-  start_time: string;
-  end_time: string;
-  is_free: boolean;
-  price: number;
-  categories: string[];
-  description: string;
-  ticket_url: string | null;
-  source_platform: string;
-  source_url: string | null;
-  image_url: string | null;
-  age_restriction: string | null;
-  door_time: string | null;
-  venue_subroom: string | null;
-  dedup_hash: string;
-  location: string;
-}
+const EB_CATEGORY_MAP: Record<string, string> = {
+  '103': 'LIVE_MUSIC',
+  '105': 'ARTS_THEATRE',
+  '104': 'ARTS_THEATRE', // Film
+  '110': 'COMMUNITY', // Food & Drink
+  '113': 'COMMUNITY', // Community
+};
 
 function dedupHash(platform: string, sourceUrl: string, startTime: string): string {
   return createHash('sha256')
@@ -34,21 +23,12 @@ function generateId(prefix: string, seed: string): string {
   return `${prefix}-${createHash('sha256').update(seed).digest('hex').substring(0, 12)}`;
 }
 
-// Convert Eventbrite category IDs to our DTL categories
-const EB_CATEGORY_MAP: Record<string, string> = {
-  '103': 'LIVE_MUSIC',
-  '105': 'ARTS_THEATRE',
-  '104': 'ARTS_THEATRE', // Film
-  '110': 'COMMUNITY', // Food & Drink
-  '113': 'COMMUNITY', // Community
-};
-
 /**
  * Fetch events for a specific Eventbrite organizer ID
  */
 async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Promise<NormalizedEvent[]> {
   try {
-    const url = `https://www.eventbriteapi.com/v3/organizations/${organizerId}/events/?status=live&expand=venue,ticket_classes`;
+    const url = `https://www.eventbriteapi.com/v3/organizers/${organizerId}/events/?status=live&expand=venue,ticket_classes`;
     const res = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -56,10 +36,7 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
       }
     });
 
-    if (!res.ok) {
-      console.warn(`[Eventbrite] Failed to fetch events for organizer ${organizerId}: ${res.statusText}`);
-      return [];
-    }
+    if (!res.ok) return [];
 
     const data = await res.json();
     const events: NormalizedEvent[] = [];
@@ -67,9 +44,8 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
     for (const ebEvent of (data.events || [])) {
       const isFree = ebEvent.is_free;
       let minPrice = 0;
-      
+
       if (!isFree && ebEvent.ticket_classes) {
-        // Find the cheapest paid ticket
         const paidTickets = ebEvent.ticket_classes.filter((tc: any) => !tc.free && tc.cost);
         if (paidTickets.length > 0) {
           minPrice = Math.min(...paidTickets.map((tc: any) => parseFloat(tc.cost.value || '0') / 100));
@@ -77,9 +53,9 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
       }
 
       const category = EB_CATEGORY_MAP[ebEvent.category_id] || 'COMMUNITY';
-      
-      let lat = 42.9849; // Default DTL lat
-      let lng = -81.2453; // Default DTL lng
+
+      let lat = 42.9849;
+      let lng = -81.2453;
       if (ebEvent.venue && ebEvent.venue.latitude && ebEvent.venue.longitude) {
         lat = parseFloat(ebEvent.venue.latitude);
         lng = parseFloat(ebEvent.venue.longitude);
@@ -92,7 +68,7 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
       events.push({
         id: generateId('eb', ebEvent.id),
         name: ebEvent.name.text,
-        venue_id: null, // We don't map EB venues to our DB yet, rely on PostGIS location
+        venue_id: null,
         start_time: startTime,
         end_time: endTime,
         is_free: isFree,
@@ -113,61 +89,137 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
 
     return events;
   } catch (err) {
-    console.error(`[Eventbrite] Error fetching for organizer ${organizerId}:`, err);
     return [];
   }
 }
 
 /**
- * Discover Eventbrite events by querying all tracked organizers in Supabase
+ * Fetch events broadly from the London ON Eventbrite directory
  */
-export async function fetchEventbriteEvents(): Promise<NormalizedEvent[]> {
+async function fetchDirectoryEvents(): Promise<NormalizedEvent[]> {
+  try {
+    const url = 'https://www.eventbrite.ca/d/canada--london/events/';
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      }
+    });
+
+    if (!res.ok) {
+      console.warn(`[Eventbrite Hybrid] Failed to fetch directory: ${res.status}`);
+      return [];
+    }
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const events: NormalizedEvent[] = [];
+
+    // Parse Schema.org Event JSON-LD
+    $('script[type="application/ld+json"]').each((_, element) => {
+      try {
+        const jsonText = $(element).html();
+        if (!jsonText) return;
+
+        let parsed = JSON.parse(jsonText);
+        if (!Array.isArray(parsed)) {
+          parsed = [parsed];
+        }
+
+        parsed.forEach((schema: any) => {
+          if (schema['@type'] !== 'Event') return;
+          
+          let lat = 42.9849;
+          let lng = -81.2453;
+          let venueSubroom = null;
+
+          if (schema.location && schema.location['@type'] === 'Place' && schema.location.geo) {
+            lat = parseFloat(schema.location.geo.latitude);
+            lng = parseFloat(schema.location.geo.longitude);
+            venueSubroom = schema.location.name || null;
+          }
+
+          const isFree = schema.offers && schema.offers.price === '0.00';
+          const price = schema.offers && schema.offers.price ? parseFloat(schema.offers.price) : 0;
+
+          // Deterministic Geographic Resolution!
+          const venue_id = matchEventToVenue(lat, lng);
+
+          events.push({
+            id: generateId('eb-ld', schema.url || schema.name),
+            name: schema.name,
+            venue_id, // Found via GeoJSON Map
+            start_time: schema.startDate,
+            end_time: schema.endDate || new Date(new Date(schema.startDate).getTime() + 3 * 3600000).toISOString(),
+            is_free: isFree,
+            price: price,
+            categories: ['COMMUNITY'], // Default
+            description: schema.description || '',
+            ticket_url: schema.url || null,
+            source_platform: 'eventbrite',
+            source_url: schema.url || null,
+            image_url: schema.image || null,
+            age_restriction: null,
+            door_time: null,
+            venue_subroom: venueSubroom,
+            dedup_hash: dedupHash('eventbrite', schema.url || schema.name, schema.startDate),
+            location: `SRID=4326;POINT(${lng} ${lat})`
+          });
+        });
+      } catch (err) {
+        // Silently skip unparseable JSON blocks
+      }
+    });
+
+    return events;
+  } catch (err) {
+    console.error('[Eventbrite Hybrid] Directory fetch failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Combination approach:
+ * 1. Fetch explicitly managed organizers from the DB.
+ * 2. Fetch the broad directory for unmapped events.
+ * 3. Combine and return them.
+ */
+export async function fetchEventbriteHybrid(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
   const apiKey = process.env.EVENTBRITE_API_KEY;
   if (!apiKey) {
-    console.warn('[Eventbrite] No EVENTBRITE_API_KEY found. Skipping extraction.');
+    console.warn('[Eventbrite Hybrid] No EVENTBRITE_API_KEY found.');
     return [];
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // 1. Fetch from Organizers
+  let organizerEvents: NormalizedEvent[] = [];
+  const { data: venues, error } = await supabase
+    .from('venues')
+    .select('id, name, location, offerings')
+    .not('offerings->eventbrite_organizer_id', 'is', null);
 
-  try {
-    // 1. Fetch all tracked organizers
-    const { data: organizers, error } = await supabase
-      .from('eventbrite_organizers')
-      .select('id, name');
+  if (!error && venues && venues.length > 0) {
+    const eventPromises = venues.map(async (venue) => {
+      const orgId = venue.offerings.eventbrite_organizer_id;
+      const ebEvents = await fetchEventsForOrganizer(orgId, apiKey);
+      
+      // Force venue mapping since we know the organizer is tied to this venue
+      return ebEvents.map(ev => ({
+        ...ev,
+        venue_id: venue.id,
+        location: venue.location // Fallback to DB location
+      }));
+    });
 
-    if (error) {
-      console.error('[Eventbrite] DB Error fetching organizers:', error);
-      return [];
-    }
-
-    if (!organizers || organizers.length === 0) {
-      console.log('[Eventbrite] No organizers tracked yet.');
-      return [];
-    }
-
-    // 2. Fetch events for each organizer in parallel
-    const eventPromises = organizers.map(org => fetchEventsForOrganizer(org.id, apiKey));
     const nestedEvents = await Promise.all(eventPromises);
-
-    // 3. Flatten and return
-    const allEvents = nestedEvents.flat();
-    
-    // Update last_scraped_at timestamp for these organizers
-    const organizerIds = organizers.map(o => o.id);
-    if (organizerIds.length > 0) {
-      await supabase
-        .from('eventbrite_organizers')
-        .update({ last_scraped_at: new Date().toISOString() })
-        .in('id', organizerIds);
-    }
-
-    return allEvents;
-  } catch (err) {
-    console.error('[Eventbrite] Fatal error during extraction:', err);
-    return [];
+    organizerEvents = nestedEvents.flat();
   }
+
+  // 2. Fetch from Directory
+  const directoryEvents = await fetchDirectoryEvents();
+
+  // Combine them. The worker upsert uses `dedup_hash` (platform|url|start_time) 
+  // with `ignoreDuplicates: true`, so duplicates between the two strategies are safely handled.
+  return [...organizerEvents, ...directoryEvents];
 }

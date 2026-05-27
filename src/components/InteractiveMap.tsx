@@ -18,6 +18,7 @@ import { useIncidentMarkers } from './map/hooks/useIncidentMarkers';
 import { useMapInit } from './map/hooks/useMapInit';
 import MapFilterBar from './map/MapFilterBar';
 import ModPinModal from './map/ModPinModal';
+import VenueSearchBar from './map/VenueSearchBar';
 import IncidentActionPanel from './crisis/IncidentActionPanel';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
@@ -57,6 +58,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(['Eatery', 'Bars', 'Stage']));
   const [forYou, setForYou] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   // Helper: toggle a venue category in the active set
   const toggleCategory = useCallback((cat: string) => {
@@ -352,6 +354,15 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
         preferences={preferences}
         mode={mode}
         userRole={userRole}
+        isSearchActive={isSearchActive}
+        setIsSearchActive={setIsSearchActive}
+        searchBarComponent={
+          <VenueSearchBar 
+            venues={venues} 
+            mapRef={mapRef} 
+            onClose={() => setIsSearchActive(false)} 
+          />
+        }
       />
 
       {/* MOD BROADCAST TOGGLE (Responders only) */}

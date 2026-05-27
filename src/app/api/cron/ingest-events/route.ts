@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 import { fetchChurchEvents } from '@/lib/scrapers/churches';
-import { fetchEventbriteEvents } from '@/lib/scrapers/eventbrite';
+import { fetchEventbriteHybrid } from '@/lib/scrapers/eventbrite';
 import { fetchGrandTheatreEvents } from '@/lib/scrapers/grandtheatre';
 
 /**
@@ -23,14 +23,14 @@ import { fetchGrandTheatreEvents } from '@/lib/scrapers/grandtheatre';
  * @see Research/Civic Data Pipeline Architecture - Event Scraping Sources.md
  */
 
-// ── Venue ID mapping for source-to-DTL resolution ──
-const VENUE_MAP: Record<string, string> = {
-  // Ticketmaster venue IDs → DTL venue IDs
+import { matchEventToVenue } from '@/lib/scrapers/venueMatcher';
+
+// ── Legacy Venue ID mapping (Fallback) ──
+const VENUE_MAP_FALLBACK: Record<string, string> = {
   '131820': 'v-london-music-hall',     // London Music Hall
   '340223': 'v-budweiser-gardens',     // Canada Life Place / Budweiser Gardens
   '132078': 'v-budweiser-gardens',     // Alternate ID for Canada Life Place
   '131548': 'v-centennial',            // Centennial Hall
-  // Add more as discovered
 };
 
 // Ticketmaster genre → DTL event_category mapping
@@ -164,10 +164,18 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<NormalizedEvent[
       const ageRestrictions = (event.ageRestrictions as Record<string, unknown> | undefined);
       const ageMin = ageRestrictions?.legalAgeEnforced as boolean;
 
-      return {
-        id: `tm-${event.id}`,
-        name: event.name as string,
-        venue_id: venueId ? (VENUE_MAP[venueId] || null) : null,
+        let finalVenueId: string | null = null;
+        if (lat && lng) {
+          finalVenueId = matchEventToVenue(lat, lng);
+        }
+        if (!finalVenueId && venueId) {
+          finalVenueId = VENUE_MAP_FALLBACK[venueId] || null;
+        }
+
+        return {
+          id: `tm-${event.id}`,
+          name: event.name as string,
+          venue_id: finalVenueId,
         start_time: startTime,
         end_time: endTime,
         is_free: isFree,
@@ -410,7 +418,7 @@ export async function GET(request: NextRequest) {
       runTm && apiKey ? fetchTicketmasterEvents(apiKey) : Promise.resolve([]),
       runLmh ? fetchLMHEvents() : Promise.resolve([]),
       runChurches ? fetchChurchEvents(supabase) : Promise.resolve([]),
-      runEb ? fetchEventbriteEvents() : Promise.resolve([]),
+      runEb ? fetchEventbriteHybrid(supabase) : Promise.resolve([]),
       runGrand ? fetchGrandTheatreEvents(supabase) : Promise.resolve([]),
     ]);
 
@@ -480,7 +488,7 @@ export async function GET(request: NextRequest) {
       ticketmaster: { events: tmEvents, platformString: 'ticketmaster' },
       lmh: { events: lmhEvents, platformString: 'lmh-wordpress' },
       churches: { events: churchEvents, platformString: 'church-scraper' },
-      eventbrite: { events: ebEvents, platformString: 'eventbrite' },
+      eventbrite: { events: ebEvents as any, platformString: 'eventbrite' },
       grandtheatre: { events: grandEvents, platformString: 'grand-theatre-scraper' },
     };
 
