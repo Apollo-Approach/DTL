@@ -66,6 +66,7 @@ export default function VenueSearchBar({ venues, mapRef, onClose }: VenueSearchB
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsFocused(true)}
           placeholder="Search venues..."
+          autoFocus
           className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all placeholder:text-neutral-500"
         />
         {/* We always show the close button to close the search mode completely */}
