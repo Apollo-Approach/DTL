@@ -141,7 +141,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
       score -= (dist * 1000);
       
       const randomFactor = shuffleSeed > 0 ? ((v.id.charCodeAt(v.id.length - 1) * shuffleSeed * 100) % 1) : 0;
-      score += randomFactor * 25; // Random noise to shuffle within tiers
+      score += randomFactor * 50000; // Massive random noise to truly scramble the array
       
       return score;
     };
@@ -183,7 +183,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
           onClick={handleShuffle}
           className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition font-bold text-sm flex items-center gap-2 border border-neutral-700 active:scale-95"
         >
-          <span className={isShuffling ? "animate-spin" : ""}>🔀</span> {isShuffling ? 'Shuffling...' : 'Shuffle Offers'}
+          <span className={`inline-block ${isShuffling ? "animate-spin" : ""}`}>🔀</span> {isShuffling ? 'Shuffling...' : 'Shuffle Offers'}
         </button>
       </div>
 
@@ -238,9 +238,9 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
             
             return (
               <li 
-                key={venue.id} 
+                key={`${venue.id}-${shuffleSeed}`} 
                 onClick={() => setSelectedVenue(venue)}
-                className={`min-w-[300px] shrink-0 snap-center p-5 bg-neutral-900 border ${
+                className={`min-w-[300px] shrink-0 snap-center p-5 bg-neutral-900 border animate-in fade-in slide-in-from-bottom-4 duration-300 ${
                   forYou && (venue.matchScore ?? 0) >= 80 
                     ? 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
                     : isPopUp 
