@@ -242,7 +242,8 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
       </div>
 
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
-        <table className="w-full text-left text-sm text-neutral-300">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-sm text-neutral-300 min-w-[600px]">
           <thead className="bg-neutral-950 text-neutral-400 text-xs uppercase">
             <tr>
               <th className="px-6 py-4">Image</th>
@@ -291,6 +292,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Editor Modal */}
