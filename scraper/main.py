@@ -298,6 +298,38 @@ def process_venues():
                             except Exception as eb_e:
                                 logger.warning(f"Failed to upsert eventbrite organizer {eb_id}: {eb_e}")
 
+                        # Extract upcoming_events and insert into events table
+                        upcoming_events = offerings_json.get("upcoming_events", [])
+                        if upcoming_events and isinstance(upcoming_events, list):
+                            logger.info(f"Found {len(upcoming_events)} events for {venue_name}")
+                            from datetime import datetime, timedelta
+                            for ev in upcoming_events:
+                                if not isinstance(ev, dict): continue
+                                ev_name = ev.get("name", "")
+                                start_time_str = ev.get("start_time", "")
+                                if not ev_name or not start_time_str: continue
+                                
+                                try:
+                                    start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                                    end_dt = start_dt + timedelta(hours=3)
+                                    
+                                    event_record = {
+                                        "venue_id": venue_id,
+                                        "name": ev_name,
+                                        "description": ev.get("description", ""),
+                                        "start_time": start_dt.isoformat(),
+                                        "end_time": end_dt.isoformat(),
+                                        "status": "published",
+                                        "ticket_url": ev.get("ticket_url") or website_url,
+                                        "source_platform": "llm_synthesis"
+                                    }
+                                    
+                                    # Upsert on conflict venue_id, name
+                                    supabase.table("events").upsert(event_record, on_conflict="venue_id, name").execute()
+                                    logger.info(f"  → Event Upserted: {ev_name}")
+                                except Exception as ev_e:
+                                    logger.warning(f"  Failed to insert event '{ev_name}' for {venue_name}: {ev_e}")
+
                         # Extract daily_specials and insert into promotions table
                         daily_specials = offerings_json.get("daily_specials", [])
                         if daily_specials and isinstance(daily_specials, list):

@@ -82,7 +82,7 @@ Your job is to read the text and extract hyper-specific, dynamic information int
 Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
 - "pricing_intel": [String describing specific prices found, e.g., "$5 Pints on Tuesdays" or "Cover charge $10". Leave empty if none]
-- "upcoming_events": [Array of specific events or recurring themes like "Trivia on Tuesdays" or "Live DJ". Leave empty if none]
+- "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp, guess year based on current date if omitted), and "ticket_url" (if mentioned, else null). Leave empty array if none found.]
 - "vibe_analysis": [A short, 1-2 sentence nuanced synthesis of the venue's actual atmosphere based on the text]
 - "daily_specials": [Array of objects with "day" (e.g., "Monday"), "deal" (e.g., "Half-price wings"), and "time_window" (e.g., "5PM-9PM" or "All day"). Extract any recurring food/drink specials, happy hours, or daily deals. Leave empty array if none found.]
 - "eventbrite_organizer_id": [If you see an Eventbrite URL for the venue's events (e.g. eventbrite.ca/o/some-name-12345), extract the NUMERIC ID at the end of the URL (e.g. "12345"). Leave null if none found.]
