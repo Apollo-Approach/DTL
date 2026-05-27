@@ -51,14 +51,40 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
 
   // Fetch Upcoming Events for this venue
   const now = new Date().toISOString();
-  const { data: events } = await supabase
+  const { data: dbEvents } = await supabase
     .from('events')
     .select('*')
     .eq('venue_id', id)
     .gte('end_time', now) // Only upcoming or currently running events
     .order('start_time', { ascending: true });
 
-  const hasEvents = events && events.length > 0;
+  const allEvents: any[] = dbEvents ? [...dbEvents] : [];
+
+  // Merge structured LLM events
+  const scrapedEvents = venue.offerings?.upcoming_events || [];
+  for (const se of scrapedEvents) {
+    if (typeof se === 'string') {
+      allEvents.push({ id: `scraped-${Math.random()}`, name: se, isScraped: true, isOldFormat: true });
+    } else if (typeof se === 'object' && se !== null) {
+      allEvents.push({ 
+        id: `scraped-${Math.random()}`, 
+        name: se.name, 
+        description: se.description,
+        start_time: se.start_time,
+        ticket_url: se.ticket_url,
+        isScraped: true 
+      });
+    }
+  }
+
+  // Sort chronologically
+  allEvents.sort((a, b) => {
+    if (!a.start_time) return 1;
+    if (!b.start_time) return -1;
+    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+  });
+
+  const hasEvents = allEvents.length > 0;
 
   // Fetch Promotions / Specials for this venue
   const { data: promotions } = await supabase
@@ -74,12 +100,26 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
   const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   // Group promotions by day
-  const promosByDay: Record<string, typeof promotions> = {};
+  const promosByDay: Record<string, any[]> = {};
   if (promotions) {
     for (const promo of promotions) {
       const day = promo.recurring_day || 'other';
       if (!promosByDay[day]) promosByDay[day] = [];
       promosByDay[day].push(promo);
+    }
+  }
+
+  // Merge structured LLM daily specials
+  const scrapedSpecials = venue.offerings?.daily_specials || [];
+  for (const spec of scrapedSpecials) {
+    if (typeof spec === 'object' && spec !== null && spec.day) {
+      const day = spec.day.toLowerCase();
+      if (!promosByDay[day]) promosByDay[day] = [];
+      promosByDay[day].push({
+        description: spec.deal,
+        active_from_time: spec.time_window,
+        isScraped: true
+      });
     }
   }
 
@@ -229,22 +269,29 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
                     className={`flex items-stretch border transition-colors ${
                       isToday
                         ? 'border-green-500/40 bg-green-500/5 shadow-[0_0_15px_rgba(34,197,94,0.08)]'
-                        : 'border-white/10 bg-black hover:border-zinc-600'
+                        : promo.isScraped
+                          ? 'border-dashed border-cyan-500/30 bg-black hover:border-cyan-500/50'
+                          : 'border-white/10 bg-black hover:border-zinc-600'
                     }`}
                   >
                     {/* Day badge */}
                     <div className={`flex items-center justify-center w-28 shrink-0 p-4 border-r ${
-                      isToday ? 'border-green-500/20 bg-green-500/10' : 'border-white/10 bg-zinc-900'
+                      isToday ? 'border-green-500/20 bg-green-500/10' : promo.isScraped ? 'border-dashed border-cyan-500/30 bg-zinc-900/50' : 'border-white/10 bg-zinc-900'
                     }`}>
                       <div className="text-center">
                         <div className={`text-xs font-black uppercase tracking-widest ${
-                          isToday ? 'text-green-400' : 'text-zinc-500'
+                          isToday ? 'text-green-400' : promo.isScraped ? 'text-cyan-500' : 'text-zinc-500'
                         }`}>
                           {day.slice(0, 3)}
                         </div>
                         {isToday && (
                           <div className="text-[9px] font-bold text-green-500 uppercase tracking-widest mt-1">
                             Today
+                          </div>
+                        )}
+                        {promo.isScraped && (
+                          <div className="text-[9px] font-bold text-cyan-500 uppercase tracking-widest mt-1 border border-cyan-500/30 px-1 py-0.5">
+                            Web Alert
                           </div>
                         )}
                       </div>
@@ -259,10 +306,9 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
                       </p>
                       {(promo.active_from_time || promo.active_until_time) && (
                         <div className="flex items-center gap-2 mt-2">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                            ⏰ {promo.active_from_time?.slice(0, 5) || 'Open'}
-                            {' — '}
-                            {promo.active_until_time?.slice(0, 5) || 'Close'}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${promo.isScraped ? 'text-cyan-500/70' : 'text-zinc-500'}`}>
+                            ⏰ {promo.active_from_time || 'Open'}
+                            {promo.active_until_time ? ` — ${promo.active_until_time}` : ''}
                           </span>
                         </div>
                       )}
@@ -295,41 +341,80 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          {!hasEvents && (!venue.offerings?.upcoming_events || venue.offerings.upcoming_events.length === 0) ? (
+          {!hasEvents ? (
             <div className="py-12 text-center bg-zinc-900/20 border border-dashed border-white/10">
               <p className="text-zinc-500 font-medium tracking-wide uppercase text-sm">No upcoming events scheduled.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {/* Structured Database Events */}
-              {events && events.map((evt) => {
-                const startDate = new Date(evt.start_time);
-                const day = startDate.toLocaleDateString('en-US', { weekday: 'short' });
-                const dateNum = startDate.getDate().toString().padStart(2, '0');
-                const month = startDate.toLocaleDateString('en-US', { month: 'short' });
-                const time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+              {/* Combined Events Timeline */}
+              {allEvents.map((evt) => {
+                const isScraped = evt.isScraped;
+                const isOldFormat = evt.isOldFormat;
+                
+                let day = 'TBD', dateNum = '??', month = '???', time = '';
+                if (evt.start_time) {
+                  const startDate = new Date(evt.start_time);
+                  if (!isNaN(startDate.getTime())) {
+                    day = startDate.toLocaleDateString('en-US', { weekday: 'short' });
+                    dateNum = startDate.getDate().toString().padStart(2, '0');
+                    month = startDate.toLocaleDateString('en-US', { month: 'short' });
+                    time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                  }
+                }
+
+                if (isOldFormat) {
+                  return (
+                    <div key={evt.id} className="group relative flex flex-col md:flex-row md:items-center bg-black border border-dashed border-white/10 hover:border-cyan-500 transition-colors">
+                      <div className="flex items-center md:flex-col md:justify-center bg-zinc-900/50 md:w-32 p-4 md:border-r border-dashed border-white/10">
+                        <div className="text-xs font-bold text-cyan-500 uppercase tracking-widest text-center">Web Alert</div>
+                      </div>
+                      
+                      <div className="flex-1 p-5 md:p-6">
+                        <h3 className="text-lg font-bold text-white uppercase tracking-tight group-hover:text-cyan-400 transition-colors">
+                          {evt.name}
+                        </h3>
+                        <p className="text-xs font-bold tracking-wider uppercase text-zinc-500 mt-2">
+                          Source: Automatically Extracted from Website
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
-                  <div key={evt.id} className="group relative flex flex-col md:flex-row md:items-center bg-black border border-white/10 hover:border-zinc-500 transition-colors">
+                  <div key={evt.id} className={`group relative flex flex-col md:flex-row md:items-center bg-black border transition-colors ${isScraped ? 'border-dashed border-cyan-500/30 hover:border-cyan-500' : 'border-white/10 hover:border-zinc-500'}`}>
                     {/* Date Block */}
-                    <div className="flex items-center md:flex-col md:justify-center bg-zinc-900 md:w-32 p-4 md:border-r border-white/10">
-                      <div className="text-sm font-bold text-zinc-500 uppercase tracking-widest mr-4 md:mr-0 md:mb-1">{day}</div>
+                    <div className={`flex items-center md:flex-col md:justify-center md:w-32 p-4 md:border-r ${isScraped ? 'bg-zinc-900/50 border-dashed border-cyan-500/30' : 'bg-zinc-900 border-white/10'}`}>
+                      <div className={`text-sm font-bold uppercase tracking-widest mr-4 md:mr-0 md:mb-1 ${isScraped ? 'text-cyan-500' : 'text-zinc-500'}`}>{day}</div>
                       <div className="text-2xl font-black text-white">{dateNum} {month}</div>
+                      {isScraped && (
+                        <div className="text-[9px] font-bold text-cyan-500 uppercase tracking-widest mt-2 border border-cyan-500/30 px-1.5 py-0.5">
+                          Web Alert
+                        </div>
+                      )}
                     </div>
                     
                     {/* Details */}
                     <div className="flex-1 p-5 md:p-6">
-                      <h3 className="text-xl font-bold text-white uppercase tracking-tight mb-2 group-hover:text-cyan-400 transition-colors">
+                      <h3 className={`text-xl font-bold uppercase tracking-tight mb-2 transition-colors ${isScraped ? 'text-cyan-400 group-hover:text-cyan-300' : 'text-white group-hover:text-cyan-400'}`}>
                         {evt.name}
                       </h3>
+                      {evt.description && (
+                        <p className="text-zinc-400 text-sm mb-3 line-clamp-2">{evt.description}</p>
+                      )}
                       <div className="flex flex-wrap items-center gap-4 text-xs font-bold tracking-wider uppercase text-zinc-500">
-                        <span className="text-zinc-300">{time}</span>
-                        <span>•</span>
-                        {evt.is_free ? (
-                          <span className="text-green-400">Free Entry</span>
-                        ) : (
-                          <span className="text-pink-500">Tickets ${evt.price}</span>
-                        )}
+                        {time && <span className="text-zinc-300">{time}</span>}
+                        {time && <span>•</span>}
+                        {evt.is_free !== undefined ? (
+                          evt.is_free ? (
+                            <span className="text-green-400">Free Entry</span>
+                          ) : (
+                            <span className="text-pink-500">Tickets ${evt.price}</span>
+                          )
+                        ) : evt.ticket_url ? (
+                          <a href={evt.ticket_url} target="_blank" rel="noopener noreferrer" className="text-cyan-500 hover:text-cyan-300 underline">Get Tickets ↗</a>
+                        ) : null}
                         {evt.age_restriction && (
                           <>
                             <span>•</span>
@@ -353,24 +438,6 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
                   </div>
                 );
               })}
-
-              {/* Synthesized LLM Events */}
-              {venue.offerings?.upcoming_events && venue.offerings.upcoming_events.map((evt: string, i: number) => (
-                  <div key={`llm-${i}`} className="group relative flex flex-col md:flex-row md:items-center bg-black border border-dashed border-white/10 hover:border-cyan-500 transition-colors">
-                    <div className="flex items-center md:flex-col md:justify-center bg-zinc-900/50 md:w-32 p-4 md:border-r border-dashed border-white/10">
-                      <div className="text-xs font-bold text-cyan-500 uppercase tracking-widest text-center">Web Alert</div>
-                    </div>
-                    
-                    <div className="flex-1 p-5 md:p-6">
-                      <h3 className="text-lg font-bold text-white uppercase tracking-tight group-hover:text-cyan-400 transition-colors">
-                        {evt}
-                      </h3>
-                      <p className="text-xs font-bold tracking-wider uppercase text-zinc-500 mt-2">
-                        Source: Automatically Extracted from Website
-                      </p>
-                    </div>
-                  </div>
-              ))}
             </div>
           )}
         </section>
