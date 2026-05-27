@@ -152,7 +152,7 @@ export const escapeHtml = (unsafe: string | null | undefined): string => {
 export const VENUE_CATEGORIES = {
   Nightlife: ['club', 'nightclub', 'lounge', 'night_club'],
   Bars: ['bar', 'pub', 'brewery'],
-  Eatery: ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery', 'eats'],
+  Eatery: ['restaurant', 'cafe', 'diner', 'pizza', 'bakery', 'meal_takeaway', 'meal_delivery', 'eats', 'eatery'],
   Stage: ['venue', 'church', 'live_music_venue', 'theater', 'performing_arts_theater'],
 } as const;
 

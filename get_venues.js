@@ -1,19 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const envFile = fs.readFileSync('.env.local', 'utf8');
-const supabaseUrl = envFile.match(/NEXT_PUBLIC_SUPABASE_URL=(.*)/)[1];
-const supabaseKey = envFile.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(.*)/)[1];
-const supabase = createClient(supabaseUrl, supabaseKey);
-async function main() {
-  const { data, error } = await supabase.from('venues').select('*');
-  if (error) console.error('Error:', error);
-  if (data) {
-    console.log(data.length, 'venues total');
-    const categories = data.reduce((acc, v) => {
-      acc[v.type] = (acc[v.type] || 0) + 1;
-      return acc;
-    }, {});
-    console.log('categories:', categories);
+require('dotenv').config({ path: '.env.local' });
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+async function run() {
+  const { data, error } = await supabase.from('venues').select('id, name, type');
+  if (error) console.error(error);
+  else {
+    const barsAndStages = data.filter(v => v.type === 'Bars' || v.type === 'Stage' || v.type === 'Eatery');
+    console.log(`Found ${barsAndStages.length} relevant venues.`);
+    require('fs').writeFileSync('venues_list.json', JSON.stringify(barsAndStages, null, 2));
   }
 }
-main();
+run();
