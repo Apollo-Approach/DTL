@@ -84,60 +84,60 @@ def scrape_venue_data(venue_name, website_url, browser):
                         except Exception as sub_e:
                             logger.warning(f"Failed to deep dive {absolute_url}: {sub_e}")
                             
-            except Exception as e:
-                logger.warning(f"Failed to scrape official site via Camoufox for {venue_name}: {e}. Falling back to Chromium headless.")
-                try:
-                    import requests
-                    from bs4 import BeautifulSoup
-                    from urllib.parse import urljoin
-                    
-                    headers = {"User-Agent": "Mozilla/5.0"}
-                    resp = requests.get(website_url, headers=headers, timeout=15)
-                    resp.raise_for_status()
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    
-                    for script in soup(["script", "style"]):
-                        script.extract()
+                except Exception as e:
+                    logger.warning(f"Failed to scrape official site via Camoufox for {venue_name}: {e}. Falling back to curl_cffi stealth requests.")
+                    try:
+                        from curl_cffi import requests
+                        from bs4 import BeautifulSoup
+                        from urllib.parse import urljoin
                         
-                    homepage_text = soup.get_text(separator=' ', strip=True)
-                    if len(homepage_text) > 50:
-                        aggregated_text += f"\n--- OFFICIAL WEBSITE (REQUESTS FALLBACK) ---\n{homepage_text[:5000]}\n"
-                        logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage via Requests fallback (truncated to 5000).")
+                        # Use curl_cffi to impersonate a real browser TLS fingerprint
+                        resp = requests.get(website_url, impersonate="chrome110", timeout=15)
+                        resp.raise_for_status()
+                        soup = BeautifulSoup(resp.text, 'html.parser')
                         
-                    target_keywords = ['events', 'calendar', 'live music', 'shows', 'menu', 'specials']
-                    deep_dive_urls = set()
-                    
-                    for a in soup.find_all('a', href=True):
-                        text = a.get_text().strip().lower()
-                        href = a['href']
-                        if href and any(keyword in text for keyword in target_keywords):
-                            if not href.startswith('javascript:') and not href.startswith('mailto:') and not href.startswith('tel:'):
-                                deep_dive_urls.add(href)
-                                
-                    max_deep_dives = 3
-                    dives_completed = 0
-                    
-                    if deep_dive_urls:
-                        for url in deep_dive_urls:
-                            if dives_completed >= max_deep_dives:
-                                break
-                            absolute_url = urljoin(website_url, url)
-                            try:
-                                sub_resp = requests.get(absolute_url, headers=headers, timeout=15)
-                                sub_resp.raise_for_status()
-                                sub_soup = BeautifulSoup(sub_resp.text, 'html.parser')
-                                for script in sub_soup(["script", "style"]):
-                                    script.extract()
-                                sub_text = sub_soup.get_text(separator=' ', strip=True)
-                                if len(sub_text) > 50:
-                                    aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:5000]}\n"
-                                dives_completed += 1
-                                gentle_sleep()
-                            except Exception as sub_e:
-                                logger.warning(f"Requests fallback failed to deep dive {absolute_url}: {sub_e}")
-                                
-                except Exception as fallback_e:
-                    logger.error(f"Chromium fallback also failed for {venue_name}: {fallback_e}")
+                        for script in soup(["script", "style"]):
+                            script.extract()
+                            
+                        homepage_text = soup.get_text(separator=' ', strip=True)
+                        if len(homepage_text) > 50:
+                            aggregated_text += f"\n--- OFFICIAL WEBSITE (REQUESTS FALLBACK) ---\n{homepage_text[:5000]}\n"
+                            logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage via curl_cffi fallback (truncated to 5000).")
+                            
+                        target_keywords = ['events', 'calendar', 'live music', 'shows', 'menu', 'specials']
+                        deep_dive_urls = set()
+                        
+                        for a in soup.find_all('a', href=True):
+                            text = a.get_text().strip().lower()
+                            href = a.get('href')
+                            if href and any(keyword in text for keyword in target_keywords):
+                                if not href.startswith('javascript:') and not href.startswith('mailto:') and not href.startswith('tel:'):
+                                    deep_dive_urls.add(href)
+                                    
+                        max_deep_dives = 3
+                        dives_completed = 0
+                        
+                        if deep_dive_urls:
+                            for url in deep_dive_urls:
+                                if dives_completed >= max_deep_dives:
+                                    break
+                                absolute_url = urljoin(website_url, url)
+                                try:
+                                    sub_resp = requests.get(absolute_url, impersonate="chrome110", timeout=15)
+                                    sub_resp.raise_for_status()
+                                    sub_soup = BeautifulSoup(sub_resp.text, 'html.parser')
+                                    for script in sub_soup(["script", "style"]):
+                                        script.extract()
+                                    sub_text = sub_soup.get_text(separator=' ', strip=True)
+                                    if len(sub_text) > 50:
+                                        aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:5000]}\n"
+                                    dives_completed += 1
+                                    gentle_sleep()
+                                except Exception as sub_e:
+                                    logger.warning(f"curl_cffi fallback failed to deep dive {absolute_url}: {sub_e}")
+                                    
+                    except Exception as fallback_e:
+                        logger.error(f"curl_cffi stealth fallback also failed for {venue_name}: {fallback_e}")
                 
                 if "Connection closed" in str(e):
                     logger.warning("Camoufox driver is dead. Returning fallback text immediately and skipping DuckDuckGo.")
