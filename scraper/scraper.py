@@ -21,33 +21,65 @@ def scrape_venue_data(venue_name, website_url, browser):
         page = browser.new_page()
 
         if website_url:
-            logger.info(f"Visiting official site via requests (safe mode): {website_url}")
+            logger.info(f"Visiting official site via Camoufox: {website_url}")
             try:
-                import requests
-                from bs4 import BeautifulSoup
+                page.goto(website_url, timeout=30000)
+                page.wait_for_load_state("domcontentloaded")
                 
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                }
-                response = requests.get(website_url, headers=headers, timeout=15)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Remove script and style elements
-                for script in soup(["script", "style"]):
-                    script.extract()
-                    
-                text = soup.get_text(separator=' ', strip=True)
-                if len(text) > 50:
-                    aggregated_text += f"\n--- OFFICIAL WEBSITE ---\n{text[:15000]}\n"
-                    logger.info(f"Successfully extracted {len(text)} chars from official site via safe mode.")
+                homepage_text = page.locator("body").inner_text()
+                if len(homepage_text) > 50:
+                    aggregated_text += f"\n--- OFFICIAL WEBSITE (HOMEPAGE) ---\n{homepage_text[:15000]}\n"
+                    logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage.")
                 else:
-                    logger.warning(f"Safe mode returned suspiciously little text ({len(text)} chars).")
+                    logger.warning(f"Homepage returned suspiciously little text ({len(homepage_text)} chars).")
+                
+                # Deep-Dive Link Hunting
+                target_keywords = ['events', 'calendar', 'live music', 'shows', 'menu', 'specials']
+                links = page.locator("a").all()
+                deep_dive_urls = set()
+                
+                for link in links:
+                    try:
+                        text = link.inner_text().strip().lower()
+                        href = link.get_attribute("href")
+                        if href and any(keyword in text for keyword in target_keywords):
+                            if not href.startswith('javascript:') and not href.startswith('mailto:') and not href.startswith('tel:'):
+                                deep_dive_urls.add(href)
+                    except Exception:
+                        continue
+                
+                max_deep_dives = 3
+                dives_completed = 0
+                
+                if deep_dive_urls:
+                    logger.info(f"Found {len(deep_dive_urls)} potential deep-dive links. Investigating up to {max_deep_dives}...")
+                    from urllib.parse import urljoin
                     
-                gentle_sleep()
+                    for url in deep_dive_urls:
+                        if dives_completed >= max_deep_dives:
+                            break
+                        
+                        absolute_url = urljoin(website_url, url)
+                        logger.info(f"Deep-diving into: {absolute_url}")
+                        
+                        try:
+                            sub_page = browser.new_page()
+                            sub_page.goto(absolute_url, timeout=20000)
+                            sub_page.wait_for_load_state("domcontentloaded")
+                            sub_text = sub_page.locator("body").inner_text()
+                            
+                            if len(sub_text) > 50:
+                                aggregated_text += f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:15000]}\n"
+                                logger.info(f"Extracted {len(sub_text)} chars from sub-page.")
+                            
+                            sub_page.close()
+                            dives_completed += 1
+                            gentle_sleep()
+                        except Exception as sub_e:
+                            logger.warning(f"Failed to deep dive {absolute_url}: {sub_e}")
+                            
             except Exception as e:
-                logger.warning(f"Failed to scrape official site via safe mode for {venue_name}: {e}")
+                logger.warning(f"Failed to scrape official site via Camoufox for {venue_name}: {e}")
 
         # Close the page and open a fresh one to prevent "navigation interrupted" errors if the previous site hung
         page.close()
