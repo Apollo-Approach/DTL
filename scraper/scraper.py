@@ -139,9 +139,9 @@ def scrape_venue_data(venue_name, website_url, browser):
                 except Exception as fallback_e:
                     logger.error(f"curl_cffi stealth fallback also failed for {venue_name}: {fallback_e}")
             
-            if "Connection closed" in str(e):
-                logger.warning("Camoufox driver is dead. Returning fallback text immediately and skipping DuckDuckGo.")
-                return aggregated_text
+                if "Connection closed" in str(e):
+                    logger.warning("Camoufox driver is dead. Returning fallback text immediately and skipping DuckDuckGo.")
+                    return aggregated_text
                     
         # Close the page and open a fresh one to prevent "navigation interrupted" errors if the previous site hung
         try:
