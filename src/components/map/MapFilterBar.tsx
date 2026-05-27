@@ -40,16 +40,16 @@ export default function MapFilterBar({
   return (
     <>
       {/* NEON BUBBLES (Instagram Stories Style Map Filters) */}
-      <div className="w-full min-w-0 overflow-hidden">
+      <div className="w-full min-w-0 relative z-50">
         <h3 className="text-xs text-neutral-400 uppercase tracking-widest font-bold mb-3 px-1">Map Filters</h3>
         
+        {/* SEARCH BAR OVERLAY (Rendered outside the mask to prevent clipping the dropdown) */}
+        <div className={`absolute top-7 left-0 right-0 px-1 z-[9999] flex items-start transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8 pointer-events-none'}`}>
+          {searchBarComponent}
+        </div>
+
         {/* Wrapper for mask fade-out effect */}
-        <div className="relative w-full [mask-image:linear-gradient(to_right,transparent_0%,black_5%,black_95%,transparent_100%)] h-[84px]">
-          
-          {/* SEARCH BAR OVERLAY */}
-          <div className={`absolute inset-0 px-4 z-20 flex items-start pt-1 transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8 pointer-events-none'}`}>
-            {searchBarComponent}
-          </div>
+        <div className="relative w-full [mask-image:linear-gradient(to_right,transparent_0%,black_5%,black_95%,transparent_100%)] h-[84px] overflow-hidden">
 
           {/* BUBBLES TRACK */}
           <div className={`absolute inset-0 flex overflow-x-auto flex-nowrap gap-3 pb-4 px-4 snap-x snap-mandatory scrollbar-hide items-start transition-all duration-300 ease-in-out ${isSearchActive ? 'opacity-0 -translate-x-8 pointer-events-none' : 'opacity-100 translate-x-0'}`}>
