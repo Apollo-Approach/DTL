@@ -79,7 +79,25 @@ def scrape_venue_data(venue_name, website_url, browser):
                             logger.warning(f"Failed to deep dive {absolute_url}: {sub_e}")
                             
             except Exception as e:
-                logger.warning(f"Failed to scrape official site via Camoufox for {venue_name}: {e}")
+                logger.warning(f"Failed to scrape official site via Camoufox for {venue_name}: {e}. Falling back to requests safe mode.")
+                try:
+                    import requests
+                    from bs4 import BeautifulSoup
+                    headers = {"User-Agent": "Mozilla/5.0"}
+                    resp = requests.get(website_url, headers=headers, timeout=15)
+                    resp.raise_for_status()
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    for script in soup(["script", "style"]):
+                        script.extract()
+                    fallback_text = soup.get_text(separator=' ', strip=True)
+                    if len(fallback_text) > 50:
+                        aggregated_text += f"\n--- OFFICIAL WEBSITE (FALLBACK) ---\n{fallback_text[:15000]}\n"
+                        logger.info(f"Successfully extracted {len(fallback_text)} chars via fallback.")
+                except Exception as fallback_e:
+                    logger.error(f"Fallback safe mode also failed for {venue_name}: {fallback_e}")
+                
+                if "Connection closed" in str(e):
+                    raise BrowserDeadError(str(e))
 
         # Close the page and open a fresh one to prevent "navigation interrupted" errors if the previous site hung
         page.close()
