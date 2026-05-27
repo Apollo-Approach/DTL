@@ -103,8 +103,9 @@ def scrape_venue_data(venue_name, website_url, browser):
                     logger.error(f"Chromium fallback also failed for {venue_name}: {fallback_e}")
                 
                 if "Connection closed" in str(e):
-                    raise BrowserDeadError(str(e))
-
+                    logger.warning("Camoufox driver is dead. Returning fallback text immediately and skipping DuckDuckGo.")
+                    return aggregated_text
+                    
         # Close the page and open a fresh one to prevent "navigation interrupted" errors if the previous site hung
         try:
             page.close()
