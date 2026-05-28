@@ -258,16 +258,12 @@ def process_venues():
                         logger.info(f"--- Processing: {venue_name} ---")
                         
                         try:
-                            raw_text = scrape_venue_data(venue_name, website_url, browser)
-                        except BrowserDeadError:
-                            logger.error(f"Browser crashed on {venue_name}. Marking venue and respawning browser for remaining venues.")
-                            try:
-                                supabase.table("venues").update({"offerings": {"error": "browser_crash"}}).eq("id", venue_id).execute()
-                            except Exception as db_e:
-                                logger.error(f"Failed to update DB for crashed venue: {db_e}")
-                            processed_ids.add(venue_id)
-                            break  # Break inner loop, re-enter while loop with fresh browser
-                        
+                            raw_text, browser_died = scrape_venue_data(venue_name, website_url, browser)
+                        except Exception as browser_e:
+                            logger.error(f"Browser crashed unexpectedly on {venue_name}: {browser_e}")
+                            browser_died = True
+                            raw_text = None
+                            
                         processed_ids.add(venue_id)
                         
                         if raw_text:
@@ -376,6 +372,10 @@ def process_venues():
                             logger.warning(f"No text extracted for {venue_name}.")
                             
                         gentle_sleep()
+                        
+                        if browser_died:
+                            logger.error(f"Browser died while processing {venue_name}. Respawning for the remaining venues...")
+                            break  # Break inner loop, re-enter while loop with fresh browser
                     else:
                         # for-loop completed without break — all remaining venues processed
                         break

@@ -44,16 +44,16 @@ def _scrape_homepage_camoufox(browser, venue_name, website_url):
         homepage_text = page.locator("body").inner_text()
         if len(homepage_text) > 50:
             logger.info(f"Successfully extracted {len(homepage_text)} chars from homepage (truncated to 5000).")
-            return homepage_text[:5000], page, True
+            return homepage_text[:5000], page, True, False
         else:
             logger.warning(f"Homepage returned suspiciously little text ({len(homepage_text)} chars).")
-            return "", page, True  # Page is still alive, just thin content
+            return "", page, True, False  # Page is still alive, just thin content
     except Exception as e:
         logger.warning(f"Camoufox homepage failed for {venue_name}: {e}")
         _safe_close_page(page)
         if _is_browser_dead(e):
-            raise BrowserDeadError(str(e))
-        return None, None, False  # Signal to try curl_cffi fallback
+            return None, None, False, True  # (text, page, used_camoufox, browser_died)
+        return None, None, False, False  # Signal to try curl_cffi fallback
 
 
 def _scrape_homepage_curl(venue_name, website_url):
@@ -224,10 +224,12 @@ def scrape_venue_data(venue_name, website_url, browser):
     homepage_page = None  # Track the Camoufox page for link hunting
     homepage_soup = None  # Track the curl_cffi soup for link hunting
     used_camoufox = False
+    browser_died = False
 
     if website_url:
         # Try Camoufox first
-        homepage_text, homepage_page, used_camoufox = _scrape_homepage_camoufox(browser, venue_name, website_url)
+        homepage_text, homepage_page, used_camoufox, browser_died_homepage = _scrape_homepage_camoufox(browser, venue_name, website_url)
+        browser_died = browser_died or browser_died_homepage
 
         if homepage_text is None:
             # Camoufox failed (but browser is still alive), try curl_cffi
@@ -243,9 +245,9 @@ def scrape_venue_data(venue_name, website_url, browser):
                 sub_sections = _hunt_deep_links_camoufox(browser, homepage_page, website_url, venue_name)
                 aggregated_text += "".join(sub_sections)
             except BrowserDeadError:
-                logger.warning("Browser died during deep-dive phase. Returning what we have.")
+                logger.warning("Browser died during deep-dive phase. Continuing with fallback.")
+                browser_died = True
                 _safe_close_page(homepage_page)
-                return aggregated_text
             finally:
                 _safe_close_page(homepage_page)
         elif homepage_soup:
@@ -294,13 +296,20 @@ def scrape_venue_data(venue_name, website_url, browser):
         except Exception as pdf_e:
             logger.warning(f"[SECTION FAILED] PDF extraction for {venue_name}: {pdf_e}")
 
-    # ---- PHASE 3: Search engine reviews ----
-    try:
-        search_text = _scrape_search_engine(browser, venue_name)
-        if search_text:
-            aggregated_text += f"\n--- SEARCH RESULTS ---\n{search_text}\n"
-    except BrowserDeadError:
-        logger.warning("Browser died during search phase. Returning what we have.")
-        raise  # Let main.py handle the respawn
+    # ---- PHASE 3: Fallback Search (DuckDuckGo) ----
+    if not browser_died:
+        try:
+            search_text = _scrape_search_engine(browser, venue_name)
+            if search_text:
+                aggregated_text += f"\n--- AGGREGATOR REVIEWS (DUCKDUCKGO) ---\n{search_text}\n"
+        except BrowserDeadError:
+            logger.warning("Browser died during search phase. Returning what we have.")
+            browser_died = True
+    else:
+        logger.warning(f"Skipping search phase for {venue_name} because browser is already dead.")
 
-    return aggregated_text
+    if not aggregated_text.strip():
+        logger.warning(f"Failed to extract any text for {venue_name} across all phases.")
+        return None, browser_died
+
+    return aggregated_text, browser_died
