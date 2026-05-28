@@ -213,7 +213,7 @@ def process_venues():
         # Optimization 1: Database-Level Filtering
         logger.info("Querying Supabase for venues...")
         import datetime
-        thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
+        four_days_ago = datetime.datetime.now() - datetime.timedelta(days=4)
         
         response = supabase.table("venues").select("id, name, website_url, offerings").execute()
         
@@ -227,7 +227,7 @@ def process_venues():
             if isinstance(offerings, dict) and "last_scraped_at" in offerings:
                 try:
                     last_scraped = datetime.datetime.fromisoformat(offerings["last_scraped_at"])
-                    if last_scraped < thirty_days_ago:
+                    if last_scraped < four_days_ago:
                         venues_to_process.append(v)
                 except ValueError:
                     venues_to_process.append(v)
@@ -267,15 +267,27 @@ def process_venues():
                         processed_ids.add(venue_id)
                         
                         if raw_text:
-                            logger.info(f"Sending {len(raw_text)} chars to Llamabox for synthesis...")
-                            offerings_json = synthesize_offerings(raw_text, venue_name)
+                            import hashlib
+                            current_hash = hashlib.sha256(raw_text.encode('utf-8')).hexdigest()
+                            old_hash = venue.get("offerings", {}).get("page_hash") if isinstance(venue.get("offerings"), dict) else None
                             
-                            logger.info(f"Synthesized JSON for {venue_name}: {offerings_json}")
-                            
-                            if offerings_json is None:
-                                logger.warning(f"Total synthesis failure for {venue_name} — skipping DB write so it retries next cycle.")
-                            elif offerings_json is not None:
-                                # Call Grounding Lite to compare
+                            if old_hash and old_hash == current_hash:
+                                logger.info(f"Hash matched for {venue_name} ({current_hash[:8]}...). Skipping Llamabox synthesis!")
+                                import datetime
+                                updated_offerings = venue.get("offerings", {})
+                                updated_offerings["last_scraped_at"] = datetime.datetime.now().isoformat()
+                                supabase.table("venues").update({"offerings": updated_offerings}).eq("id", venue_id).execute()
+                            else:
+                                logger.info(f"Sending {len(raw_text)} chars to Llamabox for synthesis (hash diff/new)...")
+                                offerings_json = synthesize_offerings(raw_text, venue_name)
+                                
+                                logger.info(f"Synthesized JSON for {venue_name}: {offerings_json}")
+                                
+                                if offerings_json is None:
+                                    logger.warning(f"Total synthesis failure for {venue_name} — skipping DB write so it retries next cycle.")
+                                elif offerings_json is not None:
+                                    offerings_json["page_hash"] = current_hash
+                                    # Call Grounding Lite to compare
                                 logger.info(f"Calling Maps Grounding Lite for {venue_name}...")
                                 maps_data = get_grounding_lite_data(venue_name)
                                 
