@@ -252,6 +252,48 @@ def scrape_venue_data(venue_name, website_url, browser):
             sub_sections = _hunt_deep_links_curl(homepage_soup, website_url, venue_name)
             aggregated_text += "".join(sub_sections)
 
+        # ---- PHASE 2.5: PDF Menu Extraction ----
+        try:
+            from pdf_extractor import find_pdf_links, extract_pdf_text
+            
+            # Get the raw HTML to scan for PDF links
+            raw_html = None
+            try:
+                from curl_cffi import requests as cffi_requests
+                resp = cffi_requests.get(website_url, impersonate="chrome110", timeout=15)
+                raw_html = resp.text
+            except Exception:
+                pass
+            
+            # Also check common menu/specials sub-pages for PDFs
+            if raw_html:
+                pdf_urls = find_pdf_links(raw_html, website_url)
+                
+                # Also probe known sub-page patterns for PDF links
+                from urllib.parse import urljoin
+                sub_page_patterns = ["menu", "the-menu", "specials", "daily-specials", "food-menu", "drinks"]
+                for pattern in sub_page_patterns:
+                    for ext in [".html", "", "/"]:
+                        probe_url = urljoin(website_url, f"{pattern}{ext}")
+                        try:
+                            probe_resp = cffi_requests.get(probe_url, impersonate="chrome110", timeout=10)
+                            if probe_resp.status_code == 200:
+                                pdf_urls.extend(find_pdf_links(probe_resp.text, probe_url))
+                        except Exception:
+                            continue
+                
+                # Deduplicate
+                pdf_urls = list(set(pdf_urls))
+                
+                if pdf_urls:
+                    logger.info(f"Found {len(pdf_urls)} PDF link(s) for {venue_name}. Extracting...")
+                    for pdf_url in pdf_urls[:3]:  # Max 3 PDFs per venue
+                        pdf_text = extract_pdf_text(pdf_url, venue_name)
+                        if pdf_text:
+                            aggregated_text += f"\n--- MENU PDF ({pdf_url}) ---\n{pdf_text}\n"
+        except Exception as pdf_e:
+            logger.warning(f"[SECTION FAILED] PDF extraction for {venue_name}: {pdf_e}")
+
     # ---- PHASE 3: Search engine reviews ----
     try:
         search_text = _scrape_search_engine(browser, venue_name)
