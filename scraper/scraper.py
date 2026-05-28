@@ -130,8 +130,8 @@ def _hunt_deep_links_camoufox(browser, page, website_url, venue_name):
             except Exception as sub_e:
                 logger.warning(f"[SECTION FAILED] Deep dive {absolute_url}: {sub_e}")
                 if _is_browser_dead(sub_e):
-                    logger.warning("Browser died during deep-dive. Returning what we have so far.")
-                    break
+                    logger.warning("Browser died during deep-dive. Raising to orchestrator.")
+                    raise BrowserDeadError(str(sub_e))
             finally:
                 _safe_close_page(sub_page)
 
