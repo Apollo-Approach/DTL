@@ -8,7 +8,7 @@ import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from scraper import scrape_venue_data, gentle_sleep
-from llm_client import synthesize_offerings
+from llm_client import synthesize_offerings, cross_reference
 
 def get_grounding_lite_data(venue_name):
     api_key = os.environ.get("MAPS_GROUNDING_LITE_API_KEY")
@@ -299,6 +299,17 @@ def process_venues():
                         if maps_data:
                             logger.info(f"Received Maps data for {venue_name}. Injecting into offerings...")
                             offerings_json["maps_grounding_lite"] = maps_data
+                            
+                            # Cross-reference LLM events against Maps Grounding data
+                            xref_warnings = cross_reference(
+                                offerings_json.get("upcoming_events", []),
+                                maps_data,
+                                venue_name
+                            )
+                            for w in xref_warnings:
+                                logger.warning(f"  [CROSS-REF] {venue_name}: {w}")
+                            if xref_warnings:
+                                offerings_json["cross_reference_warnings"] = xref_warnings
                             
                             # Reconcile: compare Maps location against DB and auto-correct if wrong
                             reconcile_venue_location(supabase, venue_id, venue_name, maps_data)
