@@ -59,8 +59,27 @@ def _scrape_homepage_curl(venue_name, website_url):
         return None, None, None
 
 
+def _browserless_single_page(url, venue_name):
+    """Render a single page via browserless and extract its text content."""
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp("ws://browserless:3000")
+            page = browser.new_page()
+            page.goto(url, timeout=20000)
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
+            text = page.locator("body").inner_text()
+            page.close()
+            browser.close()
+            logger.info(f"Browserless single-page extracted {len(text)} chars from {url}")
+            return text[:5000]
+    except Exception as e:
+        logger.warning(f"Browserless single-page fallback failed for {url}: {e}")
+        return None
+
+
 def _hunt_deep_links_curl(soup, website_url, venue_name):
-    """Phase 2: Fast link hunting using curl_cffi."""
+    """Phase 2: Fast link hunting using curl_cffi, with browserless fallback for JS-rendered sub-pages."""
     sections = []
     if not soup:
         return sections
@@ -92,8 +111,16 @@ def _hunt_deep_links_curl(soup, website_url, venue_name):
                 sub_text = sub_soup.get_text(separator=' ', strip=True)
                 if len(sub_text) > 50:
                     sections.append(f"\n--- SUB-PAGE ({absolute_url}) ---\n{sub_text[:5000]}\n")
-                dives_completed += 1
-                gentle_sleep()
+                    dives_completed += 1
+                    gentle_sleep()
+                else:
+                    # JS-rendered sub-page — try browserless fallback
+                    logger.info(f"Deep link {absolute_url} returned only {len(sub_text)} chars via curl. Trying browserless...")
+                    bl_text = _browserless_single_page(absolute_url, venue_name)
+                    if bl_text and len(bl_text) > 50:
+                        sections.append(f"\n--- SUB-PAGE ({absolute_url}) [BROWSERLESS] ---\n{bl_text[:5000]}\n")
+                    dives_completed += 1
+                    gentle_sleep()
             except Exception as sub_e:
                 logger.warning(f"[SECTION FAILED] curl_cffi deep dive {absolute_url}: {sub_e}")
     except Exception as e:
