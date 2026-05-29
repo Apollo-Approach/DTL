@@ -365,9 +365,57 @@ def process_venues():
                             for ev in upcoming_events:
                                 if not isinstance(ev, dict): continue
                                 ev_name = ev.get("name", "")
-                                start_time_str = ev.get("start_time", "")
                                 source_quote = ev.get("source_quote", "")
-                                if not ev_name or not start_time_str: continue
+                                if not ev_name: continue
+                                
+                                # If LLM returned days_of_week instead of start_time,
+                                # compute concrete dates in Python (more reliable than LLM date math)
+                                days_of_week = ev.get("days_of_week", [])
+                                start_time_str = ev.get("start_time", "")
+                                start_time_text = ev.get("start_time_text", "")
+                                
+                                if days_of_week and not start_time_str:
+                                    # Parse time text (e.g., "10pm", "9:30 PM") or default to 21:00
+                                    default_hour = 21
+                                    default_minute = 0
+                                    if start_time_text:
+                                        import re as _re
+                                        time_match = _re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)?', start_time_text)
+                                        if time_match:
+                                            h = int(time_match.group(1))
+                                            m = int(time_match.group(2) or 0)
+                                            ampm = (time_match.group(3) or "").lower()
+                                            if ampm == "pm" and h < 12: h += 12
+                                            if ampm == "am" and h == 12: h = 0
+                                            default_hour, default_minute = h, m
+                                    
+                                    # Generate concrete event entries for the next 2 weeks
+                                    day_name_to_num = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+                                    today = datetime.now().date()
+                                    
+                                    expanded_events = []
+                                    for day_name in days_of_week:
+                                        target_day = day_name_to_num.get(day_name.lower())
+                                        if target_day is None: continue
+                                        
+                                        # Find next occurrence of this day
+                                        days_ahead = (target_day - today.weekday()) % 7
+                                        if days_ahead == 0: days_ahead = 7  # Skip today, get next week
+                                        
+                                        for week_offset in [0, 1]:  # Next 2 weeks
+                                            event_date = today + timedelta(days=days_ahead + (week_offset * 7))
+                                            event_dt = datetime.combine(event_date, datetime.min.time().replace(hour=default_hour, minute=default_minute))
+                                            
+                                            expanded_ev = dict(ev)
+                                            expanded_ev["start_time"] = event_dt.strftime("%Y-%m-%dT%H:%M:%S-04:00")
+                                            expanded_events.append(expanded_ev)
+                                    
+                                    # Process expanded events instead
+                                    for exp_ev in expanded_events:
+                                        upcoming_events.append(exp_ev)
+                                    continue  # Skip this template entry, process the expanded ones
+                                
+                                if not start_time_str: continue
                                 
                                 # ── LAYER 1: Keyword grep ──
                                 # Extract meaningful keywords from the event name
