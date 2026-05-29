@@ -115,7 +115,7 @@ TODAY'S DATE: {today_iso} ({weekday_name})
 Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
 - "pricing_intel": [String describing specific prices found, e.g., "$5 Pints on Tuesdays" or "Cover charge $10". Leave empty if none]
-- "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp), and "ticket_url" (if mentioned, else null).
+- "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp), "ticket_url" (if mentioned, else null), and "source_quote" (the EXACT sentence or phrase from the raw text that mentions this event — copy it verbatim).
   CRITICAL: ONLY extract events that are EXPLICITLY mentioned in the raw text. Do NOT invent, assume, or hallucinate events. If the text does not mention trivia, karaoke, open mic, live music, or any other recurring event by name, do NOT create one. An empty array is the correct answer when no events are mentioned.
   For RECURRING weekly events that ARE explicitly mentioned in the text (e.g., the text says "Trivia every Tuesday" or "Karaoke Fridays"), generate concrete event entries using the NEXT occurrences relative to today ({today_iso}). Calculate the correct dates and output them as ISO 8601 timestamps like "2026-06-03T19:00:00-04:00". Generate entries for the next 2 weeks of recurring events.
   For one-time events with a specific date, use that date directly.

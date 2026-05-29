@@ -324,7 +324,7 @@ def process_venues():
                         # Extract upcoming_events and insert into events table
                         upcoming_events = offerings_json.get("upcoming_events", [])
                         if upcoming_events and isinstance(upcoming_events, list):
-                            logger.info(f"Found {len(upcoming_events)} events for {venue_name}")
+                            logger.info(f"Found {len(upcoming_events)} candidate events for {venue_name}")
                             from datetime import datetime, timedelta
                             import hashlib as _hashlib
                             
@@ -337,11 +337,52 @@ def process_venues():
                             except Exception:
                                 pass
                             
+                            # Build the full source text (lowercase) for validation
+                            source_text_lower = (raw_text or "").lower()
+                            
+                            validated_count = 0
+                            rejected_count = 0
+                            
                             for ev in upcoming_events:
                                 if not isinstance(ev, dict): continue
                                 ev_name = ev.get("name", "")
                                 start_time_str = ev.get("start_time", "")
+                                source_quote = ev.get("source_quote", "")
                                 if not ev_name or not start_time_str: continue
+                                
+                                # ── LAYER 1: Keyword grep ──
+                                # Extract meaningful keywords from the event name
+                                # and check if any appear in the scraped source text
+                                stop_words = {'the', 'a', 'an', 'at', 'on', 'in', 'for', 'and', 'or', 'of', 'night', 'nights', 'weekly', 'recurring', 'event', 'events', 'every'}
+                                keywords = [w.lower() for w in ev_name.split() if w.lower() not in stop_words and len(w) > 2]
+                                keyword_hits = sum(1 for kw in keywords if kw in source_text_lower)
+                                keyword_ratio = keyword_hits / max(len(keywords), 1)
+                                
+                                # ── LAYER 2: Source quote verification ──
+                                quote_verified = False
+                                if source_quote and len(source_quote) > 10:
+                                    # Check if a meaningful substring of the quote appears in source text
+                                    # Use a sliding window of 20+ chars to allow for minor LLM reformatting
+                                    quote_lower = source_quote.lower()
+                                    # Check exact match first
+                                    if quote_lower in source_text_lower:
+                                        quote_verified = True
+                                    else:
+                                        # Check if at least a 20-char substring matches
+                                        for i in range(0, max(1, len(quote_lower) - 20)):
+                                            chunk = quote_lower[i:i+20]
+                                            if chunk in source_text_lower:
+                                                quote_verified = True
+                                                break
+                                
+                                # ── DECISION ──
+                                # Accept if: keywords found in text OR source quote verified
+                                if keyword_ratio < 0.5 and not quote_verified:
+                                    logger.warning(f"  ✗ REJECTED (hallucination): '{ev_name}' — no keywords found in source text and quote not verified. Quote: '{source_quote[:80]}...'")
+                                    rejected_count += 1
+                                    continue
+                                
+                                logger.info(f"  ✓ VALIDATED: '{ev_name}' (keywords={keyword_ratio:.0%}, quote={'✓' if quote_verified else '✗'})")
                                 
                                 try:
                                     start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
@@ -372,9 +413,12 @@ def process_venues():
                                         event_record["location"] = venue_loc
                                     
                                     supabase.table("events").upsert(event_record, on_conflict="dedup_hash").execute()
+                                    validated_count += 1
                                     logger.info(f"  → Event Upserted: {ev_name} @ {start_dt.isoformat()}")
                                 except Exception as ev_e:
                                     logger.warning(f"  Failed to insert event '{ev_name}' for {venue_name}: {ev_e}")
+                            
+                            logger.info(f"  Events summary for {venue_name}: {validated_count} accepted, {rejected_count} rejected")
 
                         # Extract daily_specials and insert into promotions table
                         daily_specials = offerings_json.get("daily_specials", [])
