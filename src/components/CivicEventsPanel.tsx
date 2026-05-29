@@ -22,6 +22,20 @@ interface CivicEvent {
   source: string;
 }
 
+const SOURCE_LABELS: Record<string, { emoji: string; label: string; color: string }> = {
+  ticketmaster:       { emoji: '🎫', label: 'Ticketmaster',       color: 'text-blue-400 bg-blue-900/20 border-blue-800/30' },
+  eventbrite:         { emoji: '🎪', label: 'Eventbrite',         color: 'text-orange-400 bg-orange-900/20 border-orange-800/30' },
+  'lmh-wordpress':   { emoji: '🎵', label: 'London Music Hall',  color: 'text-violet-400 bg-violet-900/20 border-violet-800/30' },
+  london_music_hall:  { emoji: '🎵', label: 'London Music Hall',  color: 'text-violet-400 bg-violet-900/20 border-violet-800/30' },
+  grandtheatre:       { emoji: '🎭', label: 'Grand Theatre',      color: 'text-amber-400 bg-amber-900/20 border-amber-800/30' },
+  church:             { emoji: '⛪', label: 'Community',           color: 'text-teal-400 bg-teal-900/20 border-teal-800/30' },
+  llm_synthesis:      { emoji: '🍺', label: 'Venue Event',        color: 'text-emerald-400 bg-emerald-900/20 border-emerald-800/30' },
+};
+
+function getSourceInfo(source: string) {
+  return SOURCE_LABELS[source] || { emoji: '📍', label: 'Local', color: 'text-neutral-400 bg-neutral-800/40 border-neutral-700/30' };
+}
+
 export default function CivicEventsPanel() {
   const [events, setEvents] = useState<CivicEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +69,9 @@ export default function CivicEventsPanel() {
 
   const visibleEvents = expanded ? events : events.slice(0, 3);
 
+  // Count distinct sources for the header
+  const sourceCount = new Set(events.map(e => e.source)).size;
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
@@ -86,80 +103,87 @@ export default function CivicEventsPanel() {
             </div>
           </div>
           <span className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">
-            {events[0]?.source === 'ticketmaster' ? '🎫 Ticketmaster' : '📍 Local Venues'}
+            {sourceCount} {sourceCount === 1 ? 'source' : 'sources'}
           </span>
         </div>
 
         {/* Event Cards */}
         <div className="p-4 space-y-3">
-          {visibleEvents.map((event) => (
-            <a
-              key={event.id}
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group block bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 hover:border-pink-800/40 rounded-xl p-4 transition-all duration-200"
-            >
-              <div className="flex gap-4">
-                {/* Event Image or Icon */}
-                {event.imageUrl ? (
-                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-700">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={event.imageUrl} 
-                      alt={event.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-gradient-to-br from-pink-900/30 to-purple-900/30 border border-pink-800/30 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-pink-400/60" />
-                  </div>
-                )}
-
-                {/* Event Details */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-bold text-sm truncate group-hover:text-pink-300 transition-colors">
-                    {event.name}
-                  </h4>
-                  
-                  <div className="flex items-center gap-2 mt-1">
-                    <MapPin className="w-3 h-3 text-neutral-500 flex-shrink-0" />
-                    <span className="text-xs text-neutral-400 truncate">{event.venue}</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 mt-2">
-                    {event.date && (
-                      <span className="text-[10px] text-pink-400 font-bold bg-pink-900/20 px-2 py-0.5 rounded-full border border-pink-800/30">
-                        {formatDate(event.date)}
-                      </span>
-                    )}
-                    {event.time && (
-                      <span className="text-[10px] text-neutral-400 font-medium">
-                        {formatTime(event.time)}
-                      </span>
-                    )}
-                    {event.genre && (
-                      <span className="text-[10px] text-purple-400 font-medium">
-                        {event.genre}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Price / CTA */}
-                <div className="flex flex-col items-end justify-between flex-shrink-0">
-                  {event.priceRange && (
-                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-800/30">
-                      {event.priceRange}
-                    </span>
+          {visibleEvents.map((event) => {
+            const sourceInfo = getSourceInfo(event.source);
+            return (
+              <a
+                key={event.id}
+                href={event.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block bg-neutral-800/50 hover:bg-neutral-800 border border-neutral-700/50 hover:border-pink-800/40 rounded-xl p-4 transition-all duration-200"
+              >
+                <div className="flex gap-4">
+                  {/* Event Image or Icon */}
+                  {event.imageUrl ? (
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-700">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={event.imageUrl} 
+                        alt={event.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-gradient-to-br from-pink-900/30 to-purple-900/30 border border-pink-800/30 flex items-center justify-center">
+                      <Music className="w-6 h-6 text-pink-400/60" />
+                    </div>
                   )}
-                  <ExternalLink className="w-3.5 h-3.5 text-neutral-600 group-hover:text-pink-400 transition-colors" />
+
+                  {/* Event Details */}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-white font-bold text-sm truncate group-hover:text-pink-300 transition-colors">
+                      {event.name}
+                    </h4>
+                    
+                    <div className="flex items-center gap-2 mt-1">
+                      <MapPin className="w-3 h-3 text-neutral-500 flex-shrink-0" />
+                      <span className="text-xs text-neutral-400 truncate">{event.venue}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {event.date && (
+                        <span className="text-[10px] text-pink-400 font-bold bg-pink-900/20 px-2 py-0.5 rounded-full border border-pink-800/30">
+                          {formatDate(event.date)}
+                        </span>
+                      )}
+                      {event.time && (
+                        <span className="text-[10px] text-neutral-400 font-medium">
+                          {formatTime(event.time)}
+                        </span>
+                      )}
+                      {event.genre && (
+                        <span className="text-[10px] text-purple-400 font-medium">
+                          {event.genre}
+                        </span>
+                      )}
+                      {/* Source Pill */}
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${sourceInfo.color}`}>
+                        {sourceInfo.emoji} {sourceInfo.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Price / CTA */}
+                  <div className="flex flex-col items-end justify-between flex-shrink-0">
+                    {event.priceRange && (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-800/30">
+                        {event.priceRange}
+                      </span>
+                    )}
+                    <ExternalLink className="w-3.5 h-3.5 text-neutral-600 group-hover:text-pink-400 transition-colors" />
+                  </div>
                 </div>
-              </div>
-            </a>
-          ))}
+              </a>
+            );
+          })}
 
           {/* Show More / Less */}
           {events.length > 3 && (

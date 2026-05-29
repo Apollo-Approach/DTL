@@ -22,3 +22,11 @@ services:
     shm_size: '2gb'
     environment:
       - EVENT_CYCLE_HOURS=6
+
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: browserless
+    restart: unless-stopped
+    shm_size: '2gb'
+    environment:
+      - MAX_CONCURRENT_SESSIONS=3

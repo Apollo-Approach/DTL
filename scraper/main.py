@@ -7,8 +7,7 @@ import logging
 import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from camoufox.sync_api import Camoufox
-from scraper import scrape_venue_data, gentle_sleep, BrowserDeadError
+from scraper import scrape_venue_data, gentle_sleep
 from llm_client import synthesize_offerings
 
 def get_grounding_lite_data(venue_name):
@@ -203,17 +202,13 @@ def process_venues():
     logger.info("Starting venue enrichment cycle...")
     
     try:
-        # Reset venues that were flagged as browser_crash so we can try the new safe mode
-        logger.info("Resetting previously crashed venues...")
-        try:
-            supabase.table("venues").update({"offerings": "{}"}).filter("offerings->error", "eq", '"browser_crash"').execute()
-        except Exception as e:
-            pass
+        # Removed the logic that resets previously crashed venues, 
+        # so we don't end up in an infinite crash loop on bad sites.
 
         # Optimization 1: Database-Level Filtering
         logger.info("Querying Supabase for venues...")
         import datetime
-        four_days_ago = datetime.datetime.now() - datetime.timedelta(days=4)
+        four_days_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=4)
         
         response = supabase.table("venues").select("id, name, website_url, offerings").execute()
         
@@ -227,6 +222,8 @@ def process_venues():
             if isinstance(offerings, dict) and "last_scraped_at" in offerings:
                 try:
                     last_scraped = datetime.datetime.fromisoformat(offerings["last_scraped_at"])
+                    if last_scraped.tzinfo is None:
+                        last_scraped = last_scraped.replace(tzinfo=datetime.timezone.utc)
                     if last_scraped < four_days_ago:
                         venues_to_process.append(v)
                 except ValueError:
@@ -239,164 +236,184 @@ def process_venues():
         if not venues_to_process:
             return True
 
-        # Optimization 2: Keep Browser Alive — with crash recovery
-        logger.info("Booting up Camoufox browser instance...")
+        # Optimization 2: Subprocess isolation
         processed_ids = set()  # Track what we've already done this cycle
         
-        while True:
-            remaining = [v for v in venues_to_process if v["id"] not in processed_ids]
-            if not remaining:
-                break
+        for venue in venues_to_process:
+            venue_id = venue["id"]
+            venue_name = venue["name"]
+            website_url = venue.get("website_url")
             
+            logger.info(f"--- Processing: {venue_name} ---")
+            
+            is_parked = False
             try:
-                with Camoufox(headless=True) as browser:
-                    for venue in remaining:
-                        venue_id = venue["id"]
-                        venue_name = venue["name"]
-                        website_url = venue.get("website_url")
-                        
-                        logger.info(f"--- Processing: {venue_name} ---")
-                        
-                        try:
-                            raw_text, browser_died = scrape_venue_data(venue_name, website_url, browser)
-                        except Exception as browser_e:
-                            logger.error(f"Browser crashed unexpectedly on {venue_name}: {browser_e}")
-                            browser_died = True
-                            raw_text = None
-                            
-                        processed_ids.add(venue_id)
-                        
-                        if raw_text:
-                            import hashlib
-                            current_hash = hashlib.sha256(raw_text.encode('utf-8')).hexdigest()
-                            old_hash = venue.get("offerings", {}).get("page_hash") if isinstance(venue.get("offerings"), dict) else None
-                            
-                            if old_hash and old_hash == current_hash:
-                                logger.info(f"Hash matched for {venue_name} ({current_hash[:8]}...). Skipping Llamabox synthesis!")
-                                import datetime
-                                updated_offerings = venue.get("offerings", {})
-                                updated_offerings["last_scraped_at"] = datetime.datetime.now().isoformat()
-                                supabase.table("venues").update({"offerings": updated_offerings}).eq("id", venue_id).execute()
-                            else:
-                                logger.info(f"Sending {len(raw_text)} chars to Llamabox for synthesis (hash diff/new)...")
-                                offerings_json = synthesize_offerings(raw_text, venue_name)
-                                
-                                logger.info(f"Synthesized JSON for {venue_name}: {offerings_json}")
-                                
-                                if offerings_json is None:
-                                    logger.warning(f"Total synthesis failure for {venue_name} — skipping DB write so it retries next cycle.")
-                                elif offerings_json is not None:
-                                    offerings_json["page_hash"] = current_hash
-                                    # Call Grounding Lite to compare
-                                logger.info(f"Calling Maps Grounding Lite for {venue_name}...")
-                                maps_data = get_grounding_lite_data(venue_name)
-                                
-                                if maps_data:
-                                    logger.info(f"Received Maps data for {venue_name}. Injecting into offerings...")
-                                    offerings_json["maps_grounding_lite"] = maps_data
-                                    
-                                    # Reconcile: compare Maps location against DB and auto-correct if wrong
-                                    reconcile_venue_location(supabase, venue_id, venue_name, maps_data)
-                                
-                                logger.info(f"Updating Supabase for {venue_name}...")
-                                import datetime
-                                offerings_json["last_scraped_at"] = datetime.datetime.now().isoformat()
-                                supabase.table("venues").update({"offerings": offerings_json}).eq("id", venue_id).execute()
-                                
-                                # Check for Eventbrite Organizer ID
-                                eb_id = offerings_json.get("eventbrite_organizer_id")
-                                if eb_id and str(eb_id).isdigit():
-                                    logger.info(f"Discovered Eventbrite Organizer ID {eb_id} for {venue_name}")
-                                    try:
-                                        supabase.table("eventbrite_organizers").upsert({
-                                            "id": str(eb_id),
-                                            "name": venue_name,
-                                            "discovery_source": "llm_website_scraper"
-                                        }, on_conflict="id").execute()
-                                    except Exception as eb_e:
-                                        logger.warning(f"Failed to upsert eventbrite organizer {eb_id}: {eb_e}")
-
-                                # Extract upcoming_events and insert into events table
-                                upcoming_events = offerings_json.get("upcoming_events", [])
-                                if upcoming_events and isinstance(upcoming_events, list):
-                                    logger.info(f"Found {len(upcoming_events)} events for {venue_name}")
-                                    from datetime import datetime, timedelta
-                                    for ev in upcoming_events:
-                                        if not isinstance(ev, dict): continue
-                                        ev_name = ev.get("name", "")
-                                        start_time_str = ev.get("start_time", "")
-                                        if not ev_name or not start_time_str: continue
-                                        
-                                        try:
-                                            start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                                            end_dt = start_dt + timedelta(hours=3)
-                                            
-                                            event_record = {
-                                                "venue_id": venue_id,
-                                                "name": ev_name,
-                                                "description": ev.get("description", ""),
-                                                "start_time": start_dt.isoformat(),
-                                                "end_time": end_dt.isoformat(),
-                                                "status": "published",
-                                                "ticket_url": ev.get("ticket_url") or website_url,
-                                                "source_platform": "llm_synthesis"
-                                            }
-                                            
-                                            # Upsert on conflict venue_id, name
-                                            supabase.table("events").upsert(event_record, on_conflict="venue_id, name").execute()
-                                            logger.info(f"  → Event Upserted: {ev_name}")
-                                        except Exception as ev_e:
-                                            logger.warning(f"  Failed to insert event '{ev_name}' for {venue_name}: {ev_e}")
-
-                                # Extract daily_specials and insert into promotions table
-                                daily_specials = offerings_json.get("daily_specials", [])
-                                if daily_specials and isinstance(daily_specials, list):
-                                    logger.info(f"Found {len(daily_specials)} daily specials for {venue_name}")
-                                    import hashlib
-                                    from datetime import datetime, timedelta, timezone
-                                    for special in daily_specials:
-                                        if not isinstance(special, dict):
-                                            continue
-                                        day = special.get("day", "")
-                                        deal = special.get("deal", "")
-                                        time_window = special.get("time_window", "")
-                                        if not day or not deal:
-                                            continue
-                                        # Generate dedup hash
-                                        dedup_str = f"{venue_id}|{day.lower()}|{deal.lower()}"
-                                        dedup_hash = hashlib.sha256(dedup_str.encode()).hexdigest()
-                                        promo = {
-                                            "venue_id": venue_id,
-                                            "title": deal,
-                                            "description": f"{day}: {deal}" + (f" ({time_window})" if time_window else ""),
-                                            "discount_value": deal,
-                                            "active_until": (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),
-                                            "recurring_day": day.lower(),
-                                            "source_platform": "llm_synthesis",
-                                            "dedup_hash": dedup_hash,
-                                        }
-                                        try:
-                                            supabase.table("promotions").upsert(promo, on_conflict="dedup_hash").execute()
-                                            logger.info(f"  → Promo: {day} - {deal}")
-                                        except Exception as promo_e:
-                                            logger.warning(f"  Failed to insert promo for {venue_name}: {promo_e}")
-                        else:
-                            logger.warning(f"No text extracted for {venue_name}.")
-                            
-                        gentle_sleep()
-                        
-                        if browser_died:
-                            logger.error(f"Browser died while processing {venue_name}. Respawning for the remaining venues...")
-                            break  # Break inner loop, re-enter while loop with fresh browser
-                    else:
-                        # for-loop completed without break — all remaining venues processed
-                        break
-            except Exception as browser_e:
-                logger.error(f"Browser session failed unexpectedly: {browser_e}", exc_info=True)
-                logger.info("Will respawn browser and continue with remaining venues...")
-                time.sleep(5)
-
+                raw_text, browser_died, is_parked = scrape_venue_data(venue_name, website_url)
+            except Exception as e:
+                logger.error(f"Scrape loop failed unexpectedly on {venue_name}: {e}", exc_info=True)
+                browser_died = True
+                raw_text = None
+                is_parked = False
                 
+            processed_ids.add(venue_id)
+            
+            if is_parked:
+                import datetime
+                updated_offerings = venue.get("offerings", {})
+                if not isinstance(updated_offerings, dict):
+                    updated_offerings = {}
+                updated_offerings["error"] = "parked_domain"
+                updated_offerings["last_scraped_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                supabase.table("venues").update({"offerings": updated_offerings}).eq("id", venue_id).execute()
+                continue
+
+            if raw_text:
+                import hashlib
+                current_hash = hashlib.sha256(raw_text.encode('utf-8')).hexdigest()
+                old_hash = venue.get("offerings", {}).get("page_hash") if isinstance(venue.get("offerings"), dict) else None
+                
+                if old_hash and old_hash == current_hash:
+                    logger.info(f"Hash matched for {venue_name} ({current_hash[:8]}...). Skipping Llamabox synthesis!")
+                    import datetime
+                    updated_offerings = venue.get("offerings", {})
+                    if browser_died:
+                        updated_offerings["warnings"] = updated_offerings.get("warnings", []) + ["camoufox_crashed"]
+                    updated_offerings["last_scraped_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    supabase.table("venues").update({"offerings": updated_offerings}).eq("id", venue_id).execute()
+                else:
+                    logger.info(f"Sending {len(raw_text)} chars to Llamabox for synthesis (hash diff/new)...")
+                    offerings_json = synthesize_offerings(raw_text, venue_name)
+                    
+                    logger.info(f"Synthesized JSON for {venue_name}: {offerings_json}")
+                    
+                    if offerings_json is None:
+                        logger.warning(f"Total synthesis failure for {venue_name} — skipping DB write so it retries next cycle.")
+                    elif offerings_json is not None:
+                        offerings_json["page_hash"] = current_hash
+                        if browser_died:
+                            offerings_json["warnings"] = ["camoufox_crashed_used_curl_fallback"]
+                        # Call Grounding Lite to compare
+                        logger.info(f"Calling Maps Grounding Lite for {venue_name}...")
+                        maps_data = get_grounding_lite_data(venue_name)
+                        
+                        if maps_data:
+                            logger.info(f"Received Maps data for {venue_name}. Injecting into offerings...")
+                            offerings_json["maps_grounding_lite"] = maps_data
+                            
+                            # Reconcile: compare Maps location against DB and auto-correct if wrong
+                            reconcile_venue_location(supabase, venue_id, venue_name, maps_data)
+                        
+                        logger.info(f"Updating Supabase for {venue_name}...")
+                        import datetime
+                        offerings_json["last_scraped_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        supabase.table("venues").update({"offerings": offerings_json}).eq("id", venue_id).execute()
+                        
+                        # Check for Eventbrite Organizer ID
+                        eb_id = offerings_json.get("eventbrite_organizer_id")
+                        if eb_id and str(eb_id).isdigit():
+                            logger.info(f"Discovered Eventbrite Organizer ID {eb_id} for {venue_name}")
+                            try:
+                                supabase.table("eventbrite_organizers").upsert({
+                                    "id": str(eb_id),
+                                    "name": venue_name,
+                                    "discovery_source": "llm_website_scraper"
+                                }, on_conflict="id").execute()
+                            except Exception as eb_e:
+                                logger.warning(f"Failed to upsert eventbrite organizer {eb_id}: {eb_e}")
+
+                        # Extract upcoming_events and insert into events table
+                        upcoming_events = offerings_json.get("upcoming_events", [])
+                        if upcoming_events and isinstance(upcoming_events, list):
+                            logger.info(f"Found {len(upcoming_events)} events for {venue_name}")
+                            from datetime import datetime, timedelta
+                            import hashlib as _hashlib
+                            
+                            # Get venue location for the event record
+                            venue_loc = None
+                            try:
+                                venue_row = supabase.table("venues").select("location").eq("id", venue_id).single().execute()
+                                if venue_row.data:
+                                    venue_loc = venue_row.data.get("location")
+                            except Exception:
+                                pass
+                            
+                            for ev in upcoming_events:
+                                if not isinstance(ev, dict): continue
+                                ev_name = ev.get("name", "")
+                                start_time_str = ev.get("start_time", "")
+                                if not ev_name or not start_time_str: continue
+                                
+                                try:
+                                    start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                                    end_dt = start_dt + timedelta(hours=3)
+                                    
+                                    # Generate a stable dedup hash
+                                    dedup_raw = f"llm_synthesis|{venue_id}|{ev_name}|{start_dt.isoformat()}"
+                                    dedup_hash = _hashlib.sha256(dedup_raw.encode()).hexdigest()
+                                    
+                                    event_record = {
+                                        "id": f"llm-{dedup_hash[:12]}",
+                                        "venue_id": venue_id,
+                                        "name": ev_name,
+                                        "description": ev.get("description", ""),
+                                        "start_time": start_dt.isoformat(),
+                                        "end_time": end_dt.isoformat(),
+                                        "ticket_url": ev.get("ticket_url") or website_url,
+                                        "source_platform": "llm_synthesis",
+                                        "source_url": website_url,
+                                        "is_free": False,
+                                        "price": 0,
+                                        "categories": ["LIVE_MUSIC"],
+                                        "dedup_hash": dedup_hash,
+                                    }
+                                    
+                                    # Add location if we have it
+                                    if venue_loc:
+                                        event_record["location"] = venue_loc
+                                    
+                                    supabase.table("events").upsert(event_record, on_conflict="dedup_hash").execute()
+                                    logger.info(f"  → Event Upserted: {ev_name} @ {start_dt.isoformat()}")
+                                except Exception as ev_e:
+                                    logger.warning(f"  Failed to insert event '{ev_name}' for {venue_name}: {ev_e}")
+
+                        # Extract daily_specials and insert into promotions table
+                        daily_specials = offerings_json.get("daily_specials", [])
+                        if daily_specials and isinstance(daily_specials, list):
+                            logger.info(f"Found {len(daily_specials)} daily specials for {venue_name}")
+                            import hashlib
+                            from datetime import datetime, timedelta, timezone
+                            for special in daily_specials:
+                                if not isinstance(special, dict):
+                                    continue
+                                day = special.get("day", "")
+                                deal = special.get("deal", "")
+                                time_window = special.get("time_window", "")
+                                if not day or not deal:
+                                    continue
+                                # Generate dedup hash
+                                dedup_str = f"{venue_id}|{day.lower()}|{deal.lower()}"
+                                dedup_hash = hashlib.sha256(dedup_str.encode()).hexdigest()
+                                promo = {
+                                    "venue_id": venue_id,
+                                    "title": deal,
+                                    "description": f"{day}: {deal}" + (f" ({time_window})" if time_window else ""),
+                                    "discount_value": deal,
+                                    "active_until": (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),
+                                    "recurring_day": day.lower(),
+                                    "source_platform": "llm_synthesis",
+                                    "dedup_hash": dedup_hash,
+                                }
+                                try:
+                                    supabase.table("promotions").upsert(promo, on_conflict="dedup_hash").execute()
+                                    logger.info(f"  → Promo: {day} - {deal}")
+                                except Exception as promo_e:
+                                    logger.warning(f"  Failed to insert promo for {venue_name}: {promo_e}")
+            else:
+                logger.warning(f"No text extracted for {venue_name}.")
+                
+            gentle_sleep()
+            
+        return True            
         return True
             
     except Exception as e:

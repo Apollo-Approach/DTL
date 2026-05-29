@@ -100,6 +100,9 @@ def synthesize_offerings(text_content, venue_name):
     text_content = filter_irrelevant_locations(text_content)
     text_content = text_content[:40000]
 
+    today_iso = __import__('datetime').date.today().isoformat()
+    weekday_name = __import__('datetime').date.today().strftime('%A')
+
     prompt = f"""You are a deep-dive data extraction assistant. I will provide you with the raw text from the website and search results of a venue named '{venue_name}'.
 Your job is to read the text and extract hyper-specific, dynamic information into a strict JSON format. 
 
@@ -107,10 +110,15 @@ CRITICAL LOCALIZATION CONTEXT: This venue is exclusively located in London, Onta
 Focus entirely on extracting events, specials, and menu items that explicitly apply to the London, Ontario location or are brand-wide offerings. 
 Ensure all extracted data is strictly relevant to a customer visiting the London venue today.
 
+TODAY'S DATE: {today_iso} ({weekday_name})
+
 Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
 - "pricing_intel": [String describing specific prices found, e.g., "$5 Pints on Tuesdays" or "Cover charge $10". Leave empty if none]
-- "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp, guess year based on current date if omitted), and "ticket_url" (if mentioned, else null). Leave empty array if none found.]
+- "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp), and "ticket_url" (if mentioned, else null).
+  IMPORTANT: For RECURRING weekly events (e.g., "Trivia every Tuesday", "Open Mic Wednesdays", "Karaoke Fridays", "Live Music Saturdays"), you MUST generate a concrete event entry using the NEXT occurrence of that day of the week relative to today ({today_iso}). For example, if today is {weekday_name} and the venue has "Trivia Tuesdays at 7pm", calculate the next Tuesday and output it as a real ISO 8601 timestamp like "2026-06-03T19:00:00-04:00". Generate entries for the next 2 weeks of recurring events.
+  For one-time events with a specific date, use that date directly.
+  Leave empty array if no events are found.]
 - "vibe_analysis": [A short, 1-2 sentence nuanced synthesis of the venue's actual atmosphere based on the text]
 - "daily_specials": [Array of objects with "day" (e.g., "Monday"), "deal" (e.g., "Half-price wings"), and "time_window" (e.g., "5PM-9PM" or "All day"). Extract any recurring food/drink specials, happy hours, or daily deals. Leave empty array if none found.]
 - "eventbrite_organizer_id": [If you see an Eventbrite URL for the venue's events (e.g. eventbrite.ca/o/some-name-12345), extract the NUMERIC ID at the end of the URL (e.g. "12345"). Leave null if none found.]
@@ -128,9 +136,8 @@ JSON Output:
 
     payload = {
         "prompt": prompt,
-        "n_predict": 2048,
-        "temperature": 0.1,
-        "stop": ["}"]
+        "n_predict": 8192,
+        "temperature": 0.1
     }
 
     headers = {}
@@ -144,7 +151,7 @@ JSON Output:
             
             response = requests.post(LLAMABOX_URL, json=payload, headers=headers, timeout=300)
             response.raise_for_status()
-            result_text = response.json().get("content", "") + "}"
+            result_text = response.json().get("content", "")
 
             parsed = repair_json(result_text)
             if parsed is not None:

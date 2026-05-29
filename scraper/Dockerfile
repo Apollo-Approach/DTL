@@ -8,12 +8,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# ---- Layer 2: Browser binaries (rarely changes, 700MB+) ----
-# Install Playwright and Camoufox BEFORE pip packages so that
-# adding a new pip dependency doesn't trigger a 713MB re-download.
-RUN pip install --no-cache-dir playwright camoufox
-RUN playwright install --with-deps firefox
-RUN python -m camoufox fetch
+# ---- Layer 2: Removed ----
+# We now use browserless via WebSocket, so we don't need local browsers.
 
 # ---- Layer 3: Pip packages (changes occasionally) ----
 COPY requirements.txt .
