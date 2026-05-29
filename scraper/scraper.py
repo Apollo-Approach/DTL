@@ -164,6 +164,15 @@ def _scrape_spa_fallback(venue_name, website_url):
                     if not href.startswith(('javascript:', 'mailto:', 'tel:')):
                         deep_dive_urls.add(href)
             
+            # If no links found in DOM, probe common sub-page patterns
+            if not deep_dive_urls:
+                from urllib.parse import urljoin
+                for pattern in ['menu', 'events', 'specials', 'entertainment', 'calendar']:
+                    deep_dive_urls.add(urljoin(website_url, f"/{pattern}/"))
+                logger.info(f"No matching links in DOM for {venue_name}. Probing common patterns: {deep_dive_urls}")
+            else:
+                logger.info(f"Found {len(deep_dive_urls)} deep dive URLs for {venue_name}: {deep_dive_urls}")
+            
             dives_completed = 0
             for url in deep_dive_urls:
                 if dives_completed >= 3:
@@ -175,6 +184,7 @@ def _scrape_spa_fallback(venue_name, website_url):
                     sub_text = sub_page.locator("body").inner_text()
                     if len(sub_text) > 50:
                         sections.append(f"\n--- SUB-PAGE ({url}) ---\n{sub_text[:5000]}\n")
+                        logger.info(f"Browserless deep dive got {len(sub_text)} chars from {url}")
                     sub_page.close()
                     dives_completed += 1
                 except Exception as e:
