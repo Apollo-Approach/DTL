@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from scraper import scrape_venue_data, gentle_sleep
 from llm_client import synthesize_offerings, cross_reference
+from review_queue import queue_review
 
 def get_grounding_lite_data(venue_name):
     api_key = os.environ.get("MAPS_GROUNDING_LITE_API_KEY")
@@ -308,6 +309,13 @@ def process_venues():
                             )
                             for w in xref_warnings:
                                 logger.warning(f"  [CROSS-REF] {venue_name}: {w}")
+                                queue_review(
+                                    supabase, venue_id, venue_name,
+                                    review_type="cross_reference_mismatch",
+                                    title=w,
+                                    severity="warning",
+                                    details={"maps_summary": maps_data.get("summary", "")[:500]}
+                                )
                             if xref_warnings:
                                 offerings_json["cross_reference_warnings"] = xref_warnings
                             
@@ -390,6 +398,18 @@ def process_venues():
                                 # Accept if: keywords found in text OR source quote verified
                                 if keyword_ratio < 0.5 and not quote_verified:
                                     logger.warning(f"  ✗ REJECTED (hallucination): '{ev_name}' — no keywords found in source text and quote not verified. Quote: '{source_quote[:80]}...'")
+                                    queue_review(
+                                        supabase, venue_id, venue_name,
+                                        review_type="hallucination_rejected",
+                                        title=f"Rejected event: {ev_name}",
+                                        severity="warning",
+                                        details={
+                                            "event_name": ev_name,
+                                            "source_quote": source_quote[:200],
+                                            "keyword_ratio": keyword_ratio,
+                                            "quote_verified": quote_verified
+                                        }
+                                    )
                                     rejected_count += 1
                                     continue
                                 
