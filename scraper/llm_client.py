@@ -116,9 +116,10 @@ Extract the following structure:
 - "menu_highlights": [Array of 2-3 signature dishes, specific craft drinks, or dietary highlights mentioned]
 - "pricing_intel": [String describing specific prices found, e.g., "$5 Pints on Tuesdays" or "Cover charge $10". Leave empty if none]
 - "upcoming_events": [Array of specific events. Each object must have "name", "description", "start_time" (ISO 8601 timestamp), and "ticket_url" (if mentioned, else null).
-  IMPORTANT: For RECURRING weekly events (e.g., "Trivia every Tuesday", "Open Mic Wednesdays", "Karaoke Fridays", "Live Music Saturdays"), you MUST generate a concrete event entry using the NEXT occurrence of that day of the week relative to today ({today_iso}). For example, if today is {weekday_name} and the venue has "Trivia Tuesdays at 7pm", calculate the next Tuesday and output it as a real ISO 8601 timestamp like "2026-06-03T19:00:00-04:00". Generate entries for the next 2 weeks of recurring events.
+  CRITICAL: ONLY extract events that are EXPLICITLY mentioned in the raw text. Do NOT invent, assume, or hallucinate events. If the text does not mention trivia, karaoke, open mic, live music, or any other recurring event by name, do NOT create one. An empty array is the correct answer when no events are mentioned.
+  For RECURRING weekly events that ARE explicitly mentioned in the text (e.g., the text says "Trivia every Tuesday" or "Karaoke Fridays"), generate concrete event entries using the NEXT occurrences relative to today ({today_iso}). Calculate the correct dates and output them as ISO 8601 timestamps like "2026-06-03T19:00:00-04:00". Generate entries for the next 2 weeks of recurring events.
   For one-time events with a specific date, use that date directly.
-  Leave empty array if no events are found.]
+  Leave empty array if no events are explicitly mentioned in the text.]
 - "vibe_analysis": [A short, 1-2 sentence nuanced synthesis of the venue's actual atmosphere based on the text]
 - "daily_specials": [Array of objects with "day" (e.g., "Monday"), "deal" (e.g., "Half-price wings"), and "time_window" (e.g., "5PM-9PM" or "All day"). Extract any recurring food/drink specials, happy hours, or daily deals. Leave empty array if none found.]
 - "eventbrite_organizer_id": [If you see an Eventbrite URL for the venue's events (e.g. eventbrite.ca/o/some-name-12345), extract the NUMERIC ID at the end of the URL (e.g. "12345"). Leave null if none found.]
