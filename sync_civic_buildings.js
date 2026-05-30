@@ -41,13 +41,8 @@ async function run() {
     const threshold = 0.001; 
     let candidates = buildings.features.filter(b => {
       if (!b.geometry || !b.geometry.coordinates || !b.geometry.coordinates[0]) return false;
-      let firstCoord;
-      if (b.geometry.type === 'LineString') {
-        firstCoord = b.geometry.coordinates[0];
-      } else {
-        firstCoord = b.geometry.coordinates[0][0];
-      }
-      if (!firstCoord || typeof firstCoord[0] !== 'number') return false;
+      const firstCoord = b.geometry.coordinates[0][0];
+      if (!firstCoord) return false;
       return Math.abs(firstCoord[0] - coords.lng) < threshold && Math.abs(firstCoord[1] - coords.lat) < threshold;
     });
 
@@ -57,20 +52,10 @@ async function run() {
     for (const b of candidates) {
       if (!b.geometry) continue;
       
-      let polyFeature = b;
-      if (b.geometry.type === 'LineString') {
-        const c = b.geometry.coordinates;
-        if (c.length >= 4 && c[0][0] === c[c.length-1][0] && c[0][1] === c[c.length-1][1]) {
-          polyFeature = turf.polygon([c], b.properties);
-        } else {
-          continue;
-        }
-      }
-      
       try {
-        if (turf.booleanPointInPolygon(pt, polyFeature)) {
+        if (turf.booleanPointInPolygon(pt, b)) {
           minD = 0;
-          closest = polyFeature;
+          closest = b;
           break;
         }
       } catch(e) {}

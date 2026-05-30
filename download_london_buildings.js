@@ -3,7 +3,7 @@ const fs = require('fs');
 async function downloadAllBuildings() {
   console.log("Downloading MapServer/3 (Buildings Polygons) from London Open Data...");
   
-  const baseUrl = "https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/2/query";
+  const baseUrl = "https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query";
   
   // Get object IDs
   console.log("Fetching Object IDs...");
