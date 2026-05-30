@@ -17,28 +17,26 @@ export async function generatePass(promotionId: string) {
 
   const passCode = generatePassCode();
 
-  // 2. Insert the pass
-  const { data: pass, error } = await supabase
-    .from('user_passes')
-    .insert({
-      promotion_id: promotionId,
-      user_id: user.id,
-      status: 'ISSUED',
-      pass_code: passCode,
-    })
-    .select()
-    .single();
+  // 2. Atomic claim via RPC
+  const { data, error } = await supabase.rpc('claim_promotion', {
+    p_promotion_id: promotionId,
+    p_user_id: user.id,
+    p_pass_code: passCode,
+  });
 
   if (error) {
-    if (error.code === '23505') { // Unique constraint violation
-      return { success: false, error: 'You have already claimed this promotion.' };
-    }
     console.error('Error generating pass:', error);
     return { success: false, error: 'Failed to generate pass.' };
   }
 
+  const result = data as { success: boolean; error?: string; pass_id?: string };
+
+  if (!result.success) {
+    return { success: false, error: result.error || 'Failed to claim promotion.' };
+  }
+
   revalidatePath('/wallet');
-  return { success: true, pass };
+  return { success: true, pass: { id: result.pass_id, pass_code: passCode, promotion_id: promotionId, status: 'ISSUED' } };
 }
 
 export async function redeemPass(passId: string, venueId: string) {
