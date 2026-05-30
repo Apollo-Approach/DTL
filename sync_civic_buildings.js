@@ -54,28 +54,39 @@ async function run() {
     let closest = null;
     let minD = Infinity;
 
-    for (const b of candidates) {
-      if (!b.geometry) continue;
-      
-      let polyFeature = b;
-      if (b.geometry.type === 'LineString') {
-        let c = [...b.geometry.coordinates];
-        if (c.length < 3) continue;
-        if (c[0][0] !== c[c.length-1][0] || c[0][1] !== c[c.length-1][1]) {
-          c.push(c[0]); // Close the polygon mathematically
-        }
-        try {
-          polyFeature = turf.polygon([c], b.properties);
-        } catch(e) {
-          continue;
-        }
+    // Assemble local shattered LineStrings into proper Polygons first
+    const localLines = [];
+    candidates.forEach(b => {
+      if (b.geometry && b.geometry.type === 'LineString') {
+        localLines.push(b);
       }
+    });
+
+    let localPolygons = [];
+    if (localLines.length > 0) {
+      try {
+        const fc = turf.polygonize(turf.featureCollection(localLines));
+        if (fc && fc.features) {
+            localPolygons = fc.features;
+        }
+      } catch(e) {}
+    }
+
+    // Add any features that were ALREADY polygons
+    candidates.forEach(b => {
+      if (b.geometry && (b.geometry.type === 'Polygon' || b.geometry.type === 'MultiPolygon')) {
+        localPolygons.push(b);
+      }
+    });
+
+    for (const polyFeature of localPolygons) {
+      if (!polyFeature.geometry) continue;
       
       try {
         if (turf.booleanPointInPolygon(pt, polyFeature)) {
           minD = 0;
           closest = polyFeature;
-          break;
+          break; // Perfect match inside the footprint
         }
       } catch(e) {}
 
