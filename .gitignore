@@ -66,3 +66,4 @@ scraper/data/
 # Firebase service account keys (NEVER commit)
 *-firebase-adminsdk*.json
 scraper/check_retail.py
+create_issues.js
