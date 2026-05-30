@@ -67,3 +67,5 @@ scraper/data/
 *-firebase-adminsdk*.json
 scraper/check_retail.py
 create_issues.js
+london_buildings.geojson
+transit_delay_log_backup.csv.gz

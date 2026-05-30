@@ -37,12 +37,17 @@ async function run() {
     
     const pt = turf.point([coords.lng, coords.lat]);
     
-    // Efficient bounding box filter
-    const threshold = 0.001; 
+    // Efficient bounding box filter (0.005 degrees is ~500m, safe for large buildings)
+    const threshold = 0.005; 
     let candidates = buildings.features.filter(b => {
       if (!b.geometry || !b.geometry.coordinates || !b.geometry.coordinates[0]) return false;
-      const firstCoord = b.geometry.coordinates[0][0];
-      if (!firstCoord) return false;
+      let firstCoord;
+      if (b.geometry.type === 'LineString') {
+        firstCoord = b.geometry.coordinates[0];
+      } else {
+        firstCoord = b.geometry.coordinates[0][0];
+      }
+      if (!firstCoord || typeof firstCoord[0] !== 'number') return false;
       return Math.abs(firstCoord[0] - coords.lng) < threshold && Math.abs(firstCoord[1] - coords.lat) < threshold;
     });
 
@@ -52,24 +57,38 @@ async function run() {
     for (const b of candidates) {
       if (!b.geometry) continue;
       
+      let polyFeature = b;
+      if (b.geometry.type === 'LineString') {
+        let c = [...b.geometry.coordinates];
+        if (c.length < 3) continue;
+        if (c[0][0] !== c[c.length-1][0] || c[0][1] !== c[c.length-1][1]) {
+          c.push(c[0]); // Close the polygon mathematically
+        }
+        try {
+          polyFeature = turf.polygon([c], b.properties);
+        } catch(e) {
+          continue;
+        }
+      }
+      
       try {
-        if (turf.booleanPointInPolygon(pt, b)) {
+        if (turf.booleanPointInPolygon(pt, polyFeature)) {
           minD = 0;
-          closest = b;
+          closest = polyFeature;
           break;
         }
       } catch(e) {}
 
       try {
-        let lines = turf.polygonToLine(b);
+        let lines = turf.polygonToLine(polyFeature);
         if (lines.type === 'FeatureCollection') {
           for (let f of lines.features) {
             let dist = turf.pointToLineDistance(pt, f, {units: 'meters'});
-            if (dist < minD) { minD = dist; closest = b; }
+            if (dist < minD) { minD = dist; closest = polyFeature; }
           }
         } else {
           let dist = turf.pointToLineDistance(pt, lines, {units: 'meters'});
-          if (dist < minD) { minD = dist; closest = b; }
+          if (dist < minD) { minD = dist; closest = polyFeature; }
         }
       } catch(e) {}
     }
