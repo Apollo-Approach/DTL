@@ -27,6 +27,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -184,22 +185,38 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     if (!isModalOpen || !mapContainer.current || !editingVenue) return;
 
     if (!mapRef.current) {
-      mapRef.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        center: [editingVenue.lng || -81.2453, editingVenue.lat || 42.9849],
-        zoom: 15
-      });
-      
-      mapRef.current.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+      if (!(maplibregl as any).supported()) {
+        console.error("WebGL not supported");
+        setMapError(true);
+        return;
+      }
 
-      markerRef.current = new maplibregl.Marker({ color: '#ef4444' })
-        .setLngLat([editingVenue.lng || -81.2453, editingVenue.lat || 42.9849])
-        .addTo(mapRef.current);
+      try {
+        mapRef.current = new maplibregl.Map({
+          container: mapContainer.current,
+          style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+          center: [editingVenue.lng || -81.2453, editingVenue.lat || 42.9849],
+          zoom: 15
+        });
+        
+        mapRef.current.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
-      mapRef.current.on('click', (e) => {
-        setEditingVenue((prev: Venue | null) => prev ? { ...prev, lat: e.lngLat.lat, lng: e.lngLat.lng } : null);
-      });
+        markerRef.current = new maplibregl.Marker({ color: '#ef4444' })
+          .setLngLat([editingVenue.lng || -81.2453, editingVenue.lat || 42.9849])
+          .addTo(mapRef.current);
+
+        mapRef.current.on('click', (e) => {
+          setEditingVenue((prev: Venue | null) => prev ? { ...prev, lat: e.lngLat.lat, lng: e.lngLat.lng } : null);
+        });
+
+        mapRef.current.on('error', (e) => {
+          console.error("MapLibre error:", e);
+          setMapError(true);
+        });
+      } catch (e) {
+        console.error("Failed to initialize map:", e);
+        setMapError(true);
+      }
     }
 
     return () => {
@@ -321,13 +338,18 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-neutral-400 mb-1">Venue Type</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Bar, Club, Stage"
+                    <select 
                       value={editingVenue.type || ''}
                       onChange={e => setEditingVenue({...editingVenue, type: e.target.value})}
-                      className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
-                    />
+                      className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 appearance-none text-white"
+                    >
+                      <option value="" disabled>Select a type...</option>
+                      <option value="Venue">Venue</option>
+                      <option value="Bar">Bar</option>
+                      <option value="Eats 1">Eats 1</option>
+                      <option value="Eats 2">Eats 2</option>
+                      <option value="Amenity">Amenity</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-neutral-400 mb-1">Address</label>
@@ -411,6 +433,11 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                   <div className="flex-1 flex flex-col">
                     <label className="block text-xs font-bold text-neutral-400 mb-1 mt-2">Location Map (Click to set pin)</label>
                     <div ref={mapContainer} className="flex-1 min-h-[200px] bg-black border border-neutral-800 rounded-lg overflow-hidden relative">
+                      {mapError && (
+                        <div className="absolute inset-0 flex items-center justify-center p-4 text-center bg-neutral-900 text-red-400 text-xs">
+                          Map failed to load (WebGL not supported). Please use the latitude and longitude inputs below.
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-2">
                       <input 

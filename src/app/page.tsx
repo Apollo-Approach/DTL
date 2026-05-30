@@ -103,7 +103,7 @@ export default async function Home() {
         </section>
 
         {/* SAFETY MODERATION DASHBOARD */}
-        <SafetyDashboard />
+        <SafetyDashboard user={user} />
 
         {/* CIVIC EVENTS (Ticketmaster + Local Venues) */}
         <CivicEventsPanel />

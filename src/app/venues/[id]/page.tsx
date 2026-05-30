@@ -22,6 +22,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${venue.name} | DTL Nightly`,
     description: venue.description,
+    openGraph: {
+      title: `${venue.name} | DTL Nightly`,
+      description: venue.description,
+      type: 'website',
+      url: `https://dtlnightly.com/venues/${id}`,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${venue.name} | DTL Nightly`,
+      description: venue.description,
+    }
   };
 }
 
@@ -96,7 +107,7 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
   const hasPromotions = promotions && promotions.length > 0;
 
   // Get today's day name for highlighting current specials
-  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' }).toLowerCase();
   const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   // Group promotions by day
@@ -181,9 +192,14 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
               <div className="uppercase tracking-widest text-[10px] text-zinc-600 mb-1">Location</div>
               <div className="text-zinc-300">{venue.address}</div>
               {/* Map link */}
-              <a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 inline-block mt-2 font-bold uppercase tracking-wide text-xs">
-                ↗ View on Map
-              </a>
+              <div className="flex items-center gap-4 mt-2">
+                <Link href={`/?venue=${venue.id}`} className="text-cyan-400 hover:text-cyan-300 inline-block font-bold uppercase tracking-wide text-xs">
+                  ↗ View on DTL Map
+                </Link>
+                <a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-zinc-400 inline-block font-bold uppercase tracking-wide text-[10px]">
+                  Google Maps
+                </a>
+              </div>
             </div>
             
             {venue.website_url && (
@@ -356,10 +372,10 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
                 if (evt.start_time) {
                   const startDate = new Date(evt.start_time);
                   if (!isNaN(startDate.getTime())) {
-                    day = startDate.toLocaleDateString('en-US', { weekday: 'short' });
-                    dateNum = startDate.getDate().toString().padStart(2, '0');
-                    month = startDate.toLocaleDateString('en-US', { month: 'short' });
-                    time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    day = startDate.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Toronto' });
+                    dateNum = startDate.toLocaleString('en-US', { day: '2-digit', timeZone: 'America/Toronto' });
+                    month = startDate.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Toronto' });
+                    time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Toronto' });
                   }
                 }
 

@@ -67,7 +67,7 @@ export function useVenueMarkers(
       // Category-based emoji icon
       const category = getVenueCategory(venue.type);
       const categoryEmoji: Record<string, string> = {
-        Eatery: '🍴', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️',
+        Eatery: '🍔', Eats2: '🍷', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️', Amenity: '🚻',
       };
       let emoji = categoryEmoji[category] || '📍';
       
@@ -93,6 +93,7 @@ export function useVenueMarkers(
               <p style="margin: 6px 0 0 0; font-size: 12px; color: #444;">📍 ${escapeHtml(venue.address)}</p>
               ${venue.operating_hours ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #666;">🕒 ${typeof venue.operating_hours === 'object' && venue.operating_hours !== null ? Object.entries(venue.operating_hours).map(([day, hrs]) => `${escapeHtml(day)}: ${escapeHtml(String(hrs))}`).join(' · ') : escapeHtml(String(venue.operating_hours))}</p>` : ''}
               ${sanitizeUrl(venue.website_url) ? `<a href="${sanitizeUrl(venue.website_url)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; margin: 8px 0 0 0; font-size: 11px; font-weight: bold; color: #fff; background-color: #06b6d4; padding: 4px 8px; border-radius: 4px; text-decoration: none;">🔗 Website</a>` : ''}
+              <a href="/venues/${venue.id}" style="display:inline-block; margin: 8px 0 0 ${sanitizeUrl(venue.website_url) ? '6px' : '0'}; font-size: 11px; font-weight: bold; color: #fff; background-color: #6366f1; padding: 4px 8px; border-radius: 4px; text-decoration: none;">📄 Full Profile</a>
               ${isPopUp ? '<span style="display:inline-block; margin-top:8px; margin-left: 6px; padding:4px 8px; background:#06b6d4; color:#fff; font-size:10px; border-radius:4px; font-weight:bold;">POP-UP</span>' : ''}
               ${eventLink}
               ${hqLinks}

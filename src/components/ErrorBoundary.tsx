@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <h2 className="text-xl font-bold text-red-400 mb-2">Map Engine Error</h2>
           <p className="text-neutral-400 max-w-md">
-            The interactive map encountered a critical error. This can happen due to WebGL context loss or invalid data rendering.
+            The interactive map encountered a critical error. This usually means WebGL is not supported or Hardware Acceleration is disabled in your browser settings. Please try enabling Hardware Acceleration or using a different browser.
           </p>
           <button 
             onClick={() => this.setState({ hasError: false, error: null })}

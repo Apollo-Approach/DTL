@@ -41,3 +41,7 @@ body {
   animation: marker-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   z-index: 100;
 }
+
+.maplibregl-popup {
+  z-index: 200 !important;
+}

@@ -205,7 +205,7 @@ function PanicDialog({ onClose, supabase }: { onClose: () => void, supabase: Ret
 }
 
 // ─── Main Safety Dashboard ───
-export default function SafetyDashboard() {
+export default function SafetyDashboard({ user }: { user?: any }) {
   const [activePanel, setActivePanel] = useState<'none' | 'safewalk' | 'panic'>('none');
   const [safeWalkExpiresAt, setSafeWalkExpiresAt] = useState<number | null>(null);
   const supabase = React.useMemo(() => createClient(), []);
@@ -302,7 +302,13 @@ export default function SafetyDashboard() {
                 
                 {/* SafeWalk */}
                 <button
-                  onClick={() => setActivePanel('safewalk')}
+                  onClick={() => {
+                    if (!user || user.is_anonymous) {
+                      alert('You must be logged in to use SafeWalk.');
+                      return;
+                    }
+                    setActivePanel('safewalk');
+                  }}
                   disabled={safeWalkActive}
                   className={`flex-1 py-4 px-4 rounded-2xl border transition-all shadow-lg active:scale-[0.98] flex flex-col items-center gap-2 ${
                     safeWalkActive
@@ -324,7 +330,13 @@ export default function SafetyDashboard() {
 
                 {/* Panic */}
                 <button
-                  onClick={() => setActivePanel('panic')}
+                  onClick={() => {
+                    if (!user || user.is_anonymous) {
+                      alert('You must be logged in to use the Panic button.');
+                      return;
+                    }
+                    setActivePanel('panic');
+                  }}
                   className="flex-1 py-4 px-4 bg-neutral-800 hover:bg-neutral-700 text-white rounded-2xl border border-neutral-700 hover:border-red-700 transition-all shadow-lg active:scale-[0.98] flex flex-col items-center gap-2"
                 >
                   <div className="w-10 h-10 bg-red-900/20 rounded-xl flex items-center justify-center border border-red-900/40">

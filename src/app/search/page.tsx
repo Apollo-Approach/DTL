@@ -227,9 +227,9 @@ export default async function SearchPage({
                 {events.slice(0, 6).map((evt) => (
                   <div key={evt.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 hover:border-pink-500/50 transition-colors group">
                     <div className="text-xs text-pink-400 font-bold mb-2 uppercase tracking-wide">
-                      {new Date(evt.start_time).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {new Date(evt.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Toronto' })}
                       {' · '}
-                      {new Date(evt.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(evt.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Toronto' })}
                     </div>
                     <h3 className="text-lg font-bold text-white mb-1 group-hover:text-pink-400 transition-colors">{evt.name}</h3>
                     {evt.source_platform && (

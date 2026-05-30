@@ -284,21 +284,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
                     {venue.address}
                   </address>
 
-                  {/* Situation Tags */}
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="text-[10px] px-2 py-0.5 bg-neutral-800 text-neutral-400 rounded-full border border-neutral-700 font-bold capitalize">
-                          {tag.replace(/-/g, ' ')}
-                        </span>
-                      ))}
-                      {tags.length > 3 && (
-                        <span className="text-[10px] px-2 py-0.5 text-neutral-500">+{tags.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-                  
-                  <p className="text-sm text-neutral-300 leading-relaxed line-clamp-2 mb-4 flex-1">
+                  <p className="text-sm text-neutral-300 leading-relaxed line-clamp-4 mb-4 flex-1">
                     {venue.description}
                   </p>
 

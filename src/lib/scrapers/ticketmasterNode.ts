@@ -4,6 +4,13 @@ import { matchEventToVenue } from './venueMatcher';
 
 const TICKETMASTER_BASE = 'https://app.ticketmaster.com/discovery/v2';
 
+const VENUE_MAP_FALLBACK: Record<string, string> = {
+  '131820': 'v-london-music-hall',     // London Music Hall
+  '340223': 'v-budweiser-gardens',     // Canada Life Place / Budweiser Gardens
+  '132078': 'v-budweiser-gardens',     // Alternate ID for Canada Life Place
+  '131548': 'v-centennial',            // Centennial Hall
+};
+
 // Ticketmaster genre → DTL event_category mapping
 const GENRE_TO_CATEGORY: Record<string, string> = {
   'Music': 'LIVE_MUSIC',
@@ -95,9 +102,14 @@ export async function fetchTicketmasterEvents(apiKey: string): Promise<Normalize
       const ageRestrictions = (event.ageRestrictions as Record<string, unknown> | undefined);
       const ageMin = ageRestrictions?.legalAgeEnforced as boolean;
 
+      const venueId = venue?.id as string | undefined;
+
       // Deterministic Ray-Casting Match
       let finalVenueId: string | null = null;
-      if (lat && lng) {
+      if (venueId && VENUE_MAP_FALLBACK[venueId]) {
+        finalVenueId = VENUE_MAP_FALLBACK[venueId];
+      }
+      if (!finalVenueId && lat && lng) {
         finalVenueId = matchEventToVenue(lat, lng);
       }
 

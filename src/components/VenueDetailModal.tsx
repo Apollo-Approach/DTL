@@ -5,6 +5,7 @@ import { Venue, Promotion, Event } from '@/types';
 import SecureQR from '@/components/SecureQR';
 import { X, MapPin, Clock, Globe, Calendar, AlertTriangle, Tag, Ticket } from 'lucide-react';
 import { sanitizeUrl } from '@/components/map/mapHelpers';
+import Link from 'next/link';
 
 interface ConstructionWarning {
   id: string;
@@ -242,6 +243,12 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                     </a>
                   </div>
                 )}
+                
+                <div className="pt-2">
+                  <Link href={`/venues/${venue.id}`} className="inline-block px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg shadow-indigo-900/50 w-full text-center">
+                    View Full Venue Profile
+                  </Link>
+                </div>
               </div>
 
               {/* About */}

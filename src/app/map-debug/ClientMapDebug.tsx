@@ -125,8 +125,17 @@ export default function ClientMapDebug({ venues }: ClientMapDebugProps) {
       if (layers) {
         for (let i = 0; i < layers.length; i++) {
           if (layers[i].type === 'symbol') {
-            firstSymbolId = layers[i].id;
-            break;
+            if (!firstSymbolId) firstSymbolId = layers[i].id;
+            
+            const idStr = layers[i].id.toLowerCase();
+            if (idStr.includes('road') || idStr.includes('street') || idStr.includes('highway') || idStr.includes('path')) {
+              try {
+                map.setPaintProperty(layers[i].id, 'text-color', '#ffffff');
+                map.setPaintProperty(layers[i].id, 'text-halo-color', '#000000');
+                map.setPaintProperty(layers[i].id, 'text-halo-width', 2);
+                map.setLayoutProperty(layers[i].id, 'text-size', 14);
+              } catch (e) {}
+            }
           }
         }
       }

@@ -165,11 +165,11 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<NormalizedEvent[
       const ageMin = ageRestrictions?.legalAgeEnforced as boolean;
 
         let finalVenueId: string | null = null;
-        if (lat && lng) {
-          finalVenueId = matchEventToVenue(lat, lng);
+        if (venueId && VENUE_MAP_FALLBACK[venueId]) {
+          finalVenueId = VENUE_MAP_FALLBACK[venueId];
         }
-        if (!finalVenueId && venueId) {
-          finalVenueId = VENUE_MAP_FALLBACK[venueId] || null;
+        if (!finalVenueId && lat && lng) {
+          finalVenueId = matchEventToVenue(lat, lng);
         }
 
         return {

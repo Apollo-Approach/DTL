@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { calculateMatchScore } from '@/lib/matchScore';
 import { Session } from '@supabase/supabase-js';
 import { Venue, Event, SafetyIncident, Preferences, Promotion } from '@/types';
@@ -42,7 +42,25 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
 
   
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+
+  // Handle deep-linking to a specific venue
+  useEffect(() => {
+    const venueId = searchParams?.get('venue');
+    if (!venueId || !mapRef.current) return;
+    
+    const tryOpen = () => {
+      window.dispatchEvent(new CustomEvent('open-venue-popup', { detail: { venueId } }));
+    };
+    
+    const map = mapRef.current;
+    if (map.loaded()) {
+      setTimeout(tryOpen, 500); // Give markers a moment to render
+    } else {
+      map.once('idle', () => setTimeout(tryOpen, 100));
+    }
+  }, [searchParams]);
 
   const busStateRef = useRef<{ [id: string]: BusState }>({});
   

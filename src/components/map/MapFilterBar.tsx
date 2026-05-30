@@ -73,7 +73,7 @@ export default function MapFilterBar({
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Bars') ? 'text-fuchsia-400' : 'text-neutral-500'}`}>Bars</span>
               </button>
 
-              {/* Eats Bubble (multi-select) */}
+              {/* Eats 1 Bubble (multi-select) */}
               <button 
                 onClick={() => toggleCategory('Eatery')} 
                 className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
@@ -81,7 +81,18 @@ export default function MapFilterBar({
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Eatery') ? 'bg-amber-900/50 border-[3px] border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
                   🍔
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Eatery') ? 'text-amber-400' : 'text-neutral-500'}`}>Eats</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Eatery') ? 'text-amber-400' : 'text-neutral-500'}`}>Eats 1</span>
+              </button>
+
+              {/* Eats 2 Bubble (multi-select) */}
+              <button 
+                onClick={() => toggleCategory('Eats2')} 
+                className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${activeCategories.has('Eats2') ? 'bg-orange-900/50 border-[3px] border-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
+                  🍷
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${activeCategories.has('Eats2') ? 'text-orange-400' : 'text-neutral-500'}`}>Eats 2</span>
               </button>
 
               {/* Stages Bubble (multi-select) */}

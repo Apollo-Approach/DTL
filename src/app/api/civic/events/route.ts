@@ -43,6 +43,8 @@ async function fetchAggregatedEvents(): Promise<EventData[]> {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   // Query future events, join with venues for the name
+  // To avoid filtering out events where end_time is null, we check that start_time is within the last 6 hours or future
+  const cutoffTime = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const { data: events, error } = await supabase
     .from('events')
     .select(`
@@ -51,7 +53,7 @@ async function fetchAggregatedEvents(): Promise<EventData[]> {
       age_restriction, door_time, venue_subroom, location,
       venues ( name, address )
     `)
-    .gt('end_time', new Date().toISOString())
+    .gte('start_time', cutoffTime)
     .order('start_time', { ascending: true })
     .limit(50);
 
