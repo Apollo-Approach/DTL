@@ -103,7 +103,7 @@ def _hunt_deep_links_curl(soup, website_url, venue_name):
 
         dives_completed = 0
         for url in deep_dive_urls:
-            if dives_completed >= 3:
+            if dives_completed >= 25:
                 break
             absolute_url = urljoin(website_url, url)
             try:
@@ -179,7 +179,7 @@ def _scrape_spa_fallback(venue_name, website_url):
             
             dives_completed = 0
             for url in deep_dive_urls:
-                if dives_completed >= 3:
+                if dives_completed >= 25:
                     break
                 try:
                     sub_page = browser.new_page()
