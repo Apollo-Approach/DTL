@@ -42,29 +42,7 @@ export default function Map({
     map.current.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 
     const initializeMarkers = () => {
-      events.forEach(event => {
-        if (event.lng && event.lat) {
-          const el = document.createElement('div');
-          // Using explicit styles as a fallback for Tailwind dynamic values in injected elements
-          el.style.width = '16px';
-          el.style.height = '16px';
-          el.style.backgroundColor = 'var(--color-neon-purple)';
-          el.style.border = '2px solid var(--color-background)';
-          el.style.borderRadius = '50%';
-          el.style.boxShadow = '0 0 10px var(--color-neon-purple)';
-          el.style.cursor = 'pointer';
-          
-          new maplibregl.Marker({ element: el })
-            .setLngLat([event.lng, event.lat])
-            .setPopup(new maplibregl.Popup({ offset: 25 }).setHTML(
-              `<div style="color: #000; padding: 4px;">
-                <h3 style="font-weight: bold; margin: 0;">${event.name}</h3>
-                <p style="margin: 0; font-size: 14px;">${event.description || ''}</p>
-              </div>`
-            ))
-            .addTo(map.current!);
-        }
-      });
+      // Basic Map.tsx does not render event markers directly anymore.
     };
 
     map.current.on('load', initializeMarkers);

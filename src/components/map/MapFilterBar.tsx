@@ -117,18 +117,7 @@ export default function MapFilterBar({
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${layerToggles.events ? 'text-pink-400' : 'text-neutral-500'}`}>Events</span>
               </button>
 
-              {/* For You Bubble */}
-              {preferences && (
-                <button 
-                  onClick={() => setForYou(!forYou)} 
-                  className={`flex flex-col items-center gap-2 min-w-[72px] shrink-0 snap-center group`}
-                >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl transition-all duration-300 ${forYou ? 'bg-cyan-900/50 border-[3px] border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-neutral-800 border-2 border-neutral-700 opacity-50 grayscale'}`}>
-                    🎯
-                  </div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${forYou ? 'text-cyan-400' : 'text-neutral-500'}`}>For You</span>
-                </button>
-              )}
+
             </>
           )}
 

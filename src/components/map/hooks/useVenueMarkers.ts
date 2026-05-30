@@ -81,7 +81,7 @@ export function useVenueMarkers(
         </div>`;
 
       const hqLinks = isHQ ? `<div style="margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px;"><a href="/about" style="display:block; margin-bottom: 4px; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">ℹ️ About & FAQ</a><a href="/contact" style="display:block; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">📞 Contact Us</a></div>` : '';
-      const destUrl = todayEvent ? (sanitizeUrl(todayEvent.ticket_url) || sanitizeUrl(todayEvent.source_url) || `/venues/${todayEvent.venue_id}`) : '#';
+      const destUrl = todayEvent ? (sanitizeUrl(todayEvent.best_link) || `/venues/${todayEvent.venue_id}`) : '#';
       const eventLink = todayEvent ? `<div style="margin-top: 8px;"><a href="${destUrl}" ${destUrl.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''} style="display:block; padding: 6px; background-color: #22c55e; color: white; text-align: center; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px;">🎉 See Tonight's Event</a></div>` : '';
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })

@@ -60,8 +60,8 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     const coords = decodeWkbPoint((venue as any).location);
     setEditingVenue({ 
       ...venue,
-      lat: coords?.lat || 42.9849,
-      lng: coords?.lng || -81.2453
+      lat: coords?.lat || venue.lat || 42.9849,
+      lng: coords?.lng || venue.lng || -81.2453
     });
     setIsModalOpen(true);
   };

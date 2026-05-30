@@ -18,26 +18,13 @@ async function scrapeStPauls(supabase: SupabaseClient): Promise<NormalizedEvent[
       
       if (title) {
         const startTime = new Date(Date.now() + (i+1)*86400000).toISOString();
-        const endTime = new Date(Date.now() + (i+1)*86400000 + 7200000).toISOString();
         events.push({
           id: generateId('stpauls', link + startTime),
           name: title,
           venue_id: 'church-stpauls',
           start_time: startTime,
-          end_time: endTime,
-          is_free: title.toLowerCase().includes('lunchtime live'),
-          price: title.toLowerCase().includes('lunchtime live') ? 0 : 20.00,
-          categories: ['LIVE_MUSIC'],
-          description: desc || 'Join us for a beautiful musical event at St. Pauls.',
-          ticket_url: link,
-          source_platform: 'church-scraper',
-          source_url: link,
-          image_url: null,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: null,
+          best_link: link,
           dedup_hash: dedupHash('church-scraper', link, startTime),
-          location: 'SRID=4326;POINT(-81.2503 42.9845)'
         });
       }
     });
@@ -64,26 +51,13 @@ async function scrapeMetropolitan(supabase: SupabaseClient): Promise<NormalizedE
 
       if (title) {
         const startTime = new Date(Date.now() + (i+2)*86400000).toISOString();
-        const endTime = new Date(Date.now() + (i+2)*86400000 + 7200000).toISOString();
         events.push({
           id: generateId('met', link + startTime),
           name: title,
           venue_id: 'church-metropolitan',
           start_time: startTime,
-          end_time: endTime,
-          is_free: false,
-          price: 35.00,
-          categories: ['LIVE_MUSIC'],
-          description: 'A spectacular concert event hosted at Metropolitan United.',
-          ticket_url: link,
-          source_platform: 'church-scraper',
-          source_url: link,
-          image_url: null,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: null,
+          best_link: link,
           dedup_hash: dedupHash('church-scraper', link, startTime),
-          location: 'SRID=4326;POINT(-81.2478 42.9856)'
         });
       }
     });
@@ -107,26 +81,13 @@ async function scrapeColborne(supabase: SupabaseClient): Promise<NormalizedEvent
       const title = $(el).text().trim();
       if (title && title.length > 5) {
         const startTime = new Date(Date.now() + (i+3)*86400000).toISOString();
-        const endTime = new Date(Date.now() + (i+3)*86400000 + 7200000).toISOString();
         events.push({
           id: generateId('colborne', link + title + startTime),
           name: title,
           venue_id: 'church-colborne',
           start_time: startTime,
-          end_time: endTime,
-          is_free: false,
-          price: 15.00,
-          categories: ['LIVE_MUSIC'],
-          description: 'ColborneLive Concert Series event.',
-          ticket_url: link,
-          source_platform: 'church-scraper',
-          source_url: link,
-          image_url: null,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: null,
+          best_link: link,
           dedup_hash: dedupHash('church-scraper', link + title, startTime),
-          location: 'SRID=4326;POINT(-81.2415 42.9918)'
         });
       }
     });
@@ -150,26 +111,13 @@ async function scrapeDundas(supabase: SupabaseClient): Promise<NormalizedEvent[]
       const title = $(el).text().trim();
       if (title.includes('Concert') || title.includes('Symphony')) {
         const startTime = new Date(Date.now() + (i+4)*86400000).toISOString();
-        const endTime = new Date(Date.now() + (i+4)*86400000 + 7200000).toISOString();
         events.push({
           id: generateId('dundas', link + title + startTime),
           name: title,
           venue_id: 'church-dundas',
           start_time: startTime,
-          end_time: endTime,
-          is_free: false,
-          price: 20.00,
-          categories: ['LIVE_MUSIC'],
-          description: 'London Community Orchestra performance.',
-          ticket_url: link,
-          source_platform: 'church-scraper',
-          source_url: link,
-          image_url: null,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: null,
+          best_link: link,
           dedup_hash: dedupHash('church-scraper', link + title, startTime),
-          location: 'SRID=4326;POINT(-81.2420 42.9870)'
         });
       }
     });
@@ -193,26 +141,13 @@ async function scrapeFSA(supabase: SupabaseClient): Promise<NormalizedEvent[]> {
       const title = $(el).find('h3').text().trim();
       if (title) {
         const startTime = new Date(Date.now() + (i+5)*86400000).toISOString();
-        const endTime = new Date(Date.now() + (i+5)*86400000 + 7200000).toISOString();
         events.push({
           id: generateId('fsa', link + title + startTime),
           name: title,
           venue_id: 'church-fsa',
           start_time: startTime,
-          end_time: endTime,
-          is_free: false,
-          price: 25.00,
-          categories: ['LIVE_MUSIC'],
-          description: 'Live community event at First-St. Andrews.',
-          ticket_url: link,
-          source_platform: 'church-scraper',
-          source_url: link,
-          image_url: null,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: null,
+          best_link: link,
           dedup_hash: dedupHash('church-scraper', link + title, startTime),
-          location: 'SRID=4326;POINT(-81.2458 42.9861)'
         });
       }
     });

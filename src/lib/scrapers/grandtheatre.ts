@@ -87,20 +87,8 @@ export async function fetchGrandTheatreEvents(supabase: SupabaseClient): Promise
           name: title,
           venue_id: 'v-grand-theatre', // We need to add this to venues eventually
           start_time: dateParsed.start,
-          end_time: dateParsed.end,
-          is_free: false,
-          price: 45.00, // Estimated starting price
-          categories: ['ARTS_THEATRE'],
-          description: $page('meta[property="og:description"]').attr('content') || `The Grand Theatre presents ${title}.`,
-          ticket_url: url,
-          source_platform: 'grand-theatre-scraper',
-          source_url: url,
-          image_url: image,
-          age_restriction: null,
-          door_time: null,
-          venue_subroom: 'Spriet Stage',
+          best_link: url,
           dedup_hash: dedupHash('grand-theatre-scraper', url, dateParsed.start),
-          location: 'SRID=4326;POINT(-81.2505 42.9855)' // Coordinates for Grand Theatre
         } as NormalizedEvent;
       } catch (e) {
         console.error(`Error parsing Grand Theatre event ${url}:`, e);

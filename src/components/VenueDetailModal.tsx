@@ -275,30 +275,22 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                             {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                           <h4 className="text-white font-bold text-sm truncate">{evt.name}</h4>
-                          {evt.description && (
-                            <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{evt.description}</p>
-                          )}
                         </div>
-                        {sanitizeUrl(evt.ticket_url) ? (
-                          <a
-                            href={sanitizeUrl(evt.ticket_url)!}
+                        {sanitizeUrl(evt.best_link) ? (
+                          <a 
+                            href={sanitizeUrl(evt.best_link)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="shrink-0 flex items-center gap-1 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-lg shadow-pink-600/30"
+                            className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
                           >
-                            <Ticket size={12} /> Tickets
+                            Tickets
                           </a>
                         ) : (
-                          <span className="shrink-0 bg-emerald-600/20 text-emerald-400 text-xs font-bold px-3 py-2 rounded-lg border border-emerald-600/30">
-                            Free
+                          <span className="text-xs text-neutral-500 whitespace-nowrap px-3 py-1.5 border border-white/10 rounded-full">
+                            Info Only
                           </span>
                         )}
                       </div>
-                      {evt.source_platform && (
-                        <p className="text-[10px] text-neutral-600 mt-2 uppercase tracking-wider">
-                          via {evt.source_platform}
-                        </p>
-                      )}
                     </div>
                   );
                 })

@@ -38,4 +38,5 @@ WITH CHECK (
         WHERE id = auth.uid() AND role = 'm2_responder'
     )
 );
-\n-- M2 Responders can read all incidents\nCREATE POLICY "M2 Responders can read all incidents" ON public.safety_incidents FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'm2_responder'));
+-- M2 Responders can read all incidents
+CREATE POLICY "M2 Responders can read all incidents" ON public.safety_incidents FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'm2_responder'));

@@ -36,22 +36,9 @@ export const NormalizedEventSchema = z.object({
   name: z.string(),
   venue_id: z.string().nullable().optional(),
   start_time: z.string().datetime(), // ISO 8601 UTC
-  end_time: z.string().datetime().optional(), // ISO 8601 UTC
-  is_free: z.boolean(),
-  price: z.number().optional(),
-  categories: z.array(z.string()),
-  description: z.string().optional(),
-  ticket_url: z.string().nullable().optional(),
-  source_platform: z.string(),
-  source_url: z.string().nullable().optional(),
-  image_url: z.string().nullable().optional(),
-  age_restriction: z.string().nullable().optional(),
-  door_time: z.string().nullable().optional(),
-  venue_subroom: z.string().nullable().optional(),
+  best_link: z.string().nullable().optional(),
   dedup_hash: z.string().optional(),
-  location: z.string().optional(), // PostGIS POINT WKT
-  lat: z.number().optional(), // Sometimes present on client
-  lng: z.number().optional()  // Sometimes present on client
+  admin_verified: z.boolean().optional()
 });
 
 export enum IncidentType {

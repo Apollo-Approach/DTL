@@ -6,20 +6,9 @@ export interface NormalizedEvent {
   name: string;
   venue_id: string | null;
   start_time: string;
-  end_time: string;
-  is_free: boolean;
-  price: number;
-  categories: string[];
-  description: string;
-  ticket_url: string | null;
-  source_platform: string;
-  source_url: string | null;
-  image_url: string | null;
-  age_restriction: string | null;
-  door_time: string | null;
-  venue_subroom: string | null;
+  best_link: string | null;
   dedup_hash: string;
-  location: string;
+  admin_verified?: boolean;
 }
 
 export function dedupHash(platform: string, sourceUrl: string, startTime: string): string {

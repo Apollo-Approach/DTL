@@ -58,20 +58,8 @@ interface NormalizedEvent {
   name: string;
   venue_id: string | null;
   start_time: string;
-  end_time: string;
-  is_free: boolean;
-  price: number;
-  categories: string[];
-  description: string;
-  ticket_url: string | null;
-  source_platform: string;
-  source_url: string | null;
-  image_url: string | null;
-  age_restriction: string | null;
-  door_time: string | null;
-  venue_subroom: string | null;
+  best_link: string | null;
   dedup_hash: string;
-  location: string; // PostGIS POINT WKT
 }
 
 export const dynamic = 'force-dynamic';
@@ -144,25 +132,7 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<NormalizedEvent[
       const localTime = (start?.localTime as string) || '20:00:00';
 
       const startTime = `${localDate}T${localTime}-04:00`; // EDT
-      const endTime = new Date(new Date(startTime).getTime() + 3 * 3600000).toISOString(); // +3h default
-
-      const priceRanges = event.priceRanges as Array<Record<string, unknown>> | undefined;
-      const minPrice = priceRanges?.[0]?.min as number ?? 0;
-      const isFree = minPrice === 0;
-
-      const classifications = event.classifications as Array<Record<string, unknown>> | undefined;
-      const genre = (classifications?.[0]?.genre as Record<string, unknown>)?.name as string | undefined;
-      const category = genre ? (GENRE_TO_CATEGORY[genre] || 'LIVE_MUSIC') : 'LIVE_MUSIC';
-
-      const images = event.images as Array<Record<string, unknown>> | undefined;
-      const bestImage = images?.find(img =>
-        (img.ratio === '16_9' || img.ratio === '3_2') &&
-        (img.width as number) >= 300 && (img.width as number) <= 800
-      );
-
       const sourceUrl = (event.url as string) || '';
-      const ageRestrictions = (event.ageRestrictions as Record<string, unknown> | undefined);
-      const ageMin = ageRestrictions?.legalAgeEnforced as boolean;
 
         let finalVenueId: string | null = null;
         if (venueId && VENUE_MAP_FALLBACK[venueId]) {
@@ -176,22 +146,10 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<NormalizedEvent[
           id: `tm-${event.id}`,
           name: event.name as string,
           venue_id: finalVenueId,
-        start_time: startTime,
-        end_time: endTime,
-        is_free: isFree,
-        price: minPrice,
-        categories: [category],
-        description: (event.info as string) || (event.pleaseNote as string) || '',
-        ticket_url: sourceUrl || null,
-        source_platform: 'ticketmaster',
-        source_url: sourceUrl || null,
-        image_url: (bestImage?.url || images?.[0]?.url || null) as string | null,
-        age_restriction: ageMin ? '19+' : null,
-        door_time: null,
-        venue_subroom: null,
-        dedup_hash: dedupHash('ticketmaster', sourceUrl, startTime),
-        location: `SRID=4326;POINT(${lng} ${lat})`,
-      };
+          start_time: startTime,
+          best_link: sourceUrl || null,
+          dedup_hash: dedupHash('ticketmaster', sourceUrl, startTime),
+        };
     });
   } catch (err) {
     clearTimeout(timeoutId);
@@ -347,31 +305,13 @@ async function fetchLMHEvents(): Promise<NormalizedEvent[]> {
 
       const eventTime = pageData.time || '20:00:00';
       const startTime = `${pageData.date}T${eventTime}-04:00`; // EDT
-      const endTime = new Date(new Date(startTime).getTime() + 4 * 3600000).toISOString();
-
-      // Extract price from description
-      const priceMatch = item.description.match(/\$(\d+(?:\.\d{2})?)/);
-      const price = priceMatch ? parseFloat(priceMatch[1]) : 0;
-
       return {
         id: `lmh-${createHash('sha256').update(item.link).digest('hex').substring(0, 12)}`,
         name: item.title,
         venue_id: 'v-london-music-hall',
         start_time: startTime,
-        end_time: endTime,
-        is_free: price === 0,
-        price,
-        categories: ['LIVE_MUSIC'],
-        description: item.description,
-        ticket_url: item.link,
-        source_platform: 'lmh-wordpress',
-        source_url: item.link,
-        image_url: pageData.imageUrl,
-        age_restriction: '19+',
-        door_time: null,
-        venue_subroom: null,
+        best_link: item.link,
         dedup_hash: dedupHash('lmh-wordpress', item.link, startTime),
-        location: 'SRID=4326;POINT(-81.2489 42.9857)', // 185 Queens Ave
       };
     });
 
@@ -432,13 +372,11 @@ export async function GET(request: NextRequest) {
 
     // ── Upsert each event (dedup by hash) ──
     for (const event of allEvents) {
-      const source = event.source_platform === 'ticketmaster' 
-        ? 'ticketmaster' 
-        : (event.source_platform === 'church-scraper' 
-          ? 'churches' 
-          : (event.source_platform === 'eventbrite' 
-            ? 'eventbrite' 
-            : (event.source_platform === 'grand-theatre-scraper' ? 'grandtheatre' : 'lmh')));
+      let source = 'lmh';
+      if (event.id.startsWith('tm-')) source = 'ticketmaster';
+      else if (event.id.startsWith('church-') || event.id.startsWith('stpauls') || event.id.startsWith('met') || event.id.startsWith('colborne') || event.id.startsWith('dundas') || event.id.startsWith('fsa')) source = 'churches';
+      else if (event.id.startsWith('eb')) source = 'eventbrite';
+      else if (event.id.startsWith('grand')) source = 'grandtheatre';
 
       try {
         const { error } = await supabase
@@ -449,20 +387,8 @@ export async function GET(request: NextRequest) {
               name: event.name,
               venue_id: event.venue_id,
               start_time: event.start_time,
-              end_time: event.end_time,
-              is_free: event.is_free,
-              price: event.price,
-              categories: event.categories,
-              description: event.description,
-              ticket_url: event.ticket_url,
-              source_platform: event.source_platform,
-              source_url: event.source_url,
-              image_url: event.image_url,
-              age_restriction: event.age_restriction,
-              door_time: event.door_time,
-              venue_subroom: event.venue_subroom,
+              best_link: event.best_link,
               dedup_hash: event.dedup_hash,
-              location: event.location,
             },
             { onConflict: 'dedup_hash', ignoreDuplicates: true }
           );
@@ -500,12 +426,10 @@ export async function GET(request: NextRequest) {
         // We only want to delete events in the FUTURE that are missing. Past events naturally age out.
         const now = new Date().toISOString();
         
-        // Fetch existing future events for this platform to see what needs deletion
         const { data: existingEvents } = await supabase
           .from('events')
           .select('id')
-          .eq('source_platform', data.platformString)
-          .gte('end_time', now);
+          .gte('start_time', now);
           
         if (existingEvents) {
           const existingIds = existingEvents.map(e => e.id);
@@ -525,13 +449,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Purge stale events (past events older than 24 hours) ──
     const yesterday = new Date(Date.now() - 24 * 3600000).toISOString();
     const { count: purged } = await supabase
       .from('events')
       .delete({ count: 'exact' })
-      .lt('end_time', yesterday)
-      .in('source_platform', ['ticketmaster', 'lmh-wordpress', 'church-scraper', 'eventbrite', 'grand-theatre-scraper']);
+      .lt('start_time', yesterday);
 
     return NextResponse.json({
       success: true,

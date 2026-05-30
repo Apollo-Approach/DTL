@@ -9,9 +9,8 @@ export interface EventRecord {
   name: string;
   venue_id?: string;
   start_time: string;
-  end_time?: string;
-  venue_subroom?: string;
-  offerings?: any;
+  best_link?: string;
+  admin_verified?: boolean;
 }
 
 export default function EventManager({ initialEvents }: { initialEvents: EventRecord[] }) {
@@ -37,10 +36,8 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
       const payload: any = {
         name: editingEvent.name,
         venue_id: editingEvent.venue_id,
-        venue_subroom: editingEvent.venue_subroom,
         start_time: editingEvent.start_time,
-        end_time: editingEvent.end_time,
-        offerings: editingEvent.offerings || {}
+        best_link: editingEvent.best_link
       };
       
       const result = await saveEvent(payload, editingEvent.id);
@@ -58,14 +55,13 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
   };
 
   const toggleVerified = async (event: EventRecord) => {
-    const isCurrentlyVerified = event.offerings?.admin_verified === true;
-    const updatedOfferings = { ...(event.offerings || {}), admin_verified: !isCurrentlyVerified };
+    const isCurrentlyVerified = event.admin_verified === true;
     
-    const payload = { offerings: updatedOfferings };
+    const payload = { admin_verified: !isCurrentlyVerified };
     const result = await saveEvent(payload, event.id);
     
     if (result.success) {
-      setEvents(events.map(e => e.id === event.id ? { ...e, offerings: updatedOfferings } : e));
+      setEvents(events.map(e => e.id === event.id ? { ...e, admin_verified: !isCurrentlyVerified } : e));
     } else {
       alert('Failed to verify event.');
     }
@@ -102,6 +98,7 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
               <th className="px-6 py-4">Event Name</th>
               <th className="px-6 py-4">Host Venue</th>
               <th className="px-6 py-4">Date & Time</th>
+              <th className="px-6 py-4">Link</th>
               <th className="px-6 py-4">Verified</th>
               <th className="px-6 py-4 text-right">Actions</th>
             </tr>
@@ -115,7 +112,7 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-neutral-500" />
-                    <span>{e.venue_subroom || e.venue_id || 'Unknown Venue'}</span>
+                    <span>{e.venue_id || 'Unknown Venue'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -127,16 +124,25 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
                   </div>
                 </td>
                 <td className="px-6 py-4">
+                  {e.best_link ? (
+                    <a href={e.best_link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 truncate max-w-[150px] inline-block">
+                      Link
+                    </a>
+                  ) : (
+                    <span className="text-neutral-500">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
                   <button 
                     onClick={() => toggleVerified(e)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                      e.offerings?.admin_verified 
+                      e.admin_verified 
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
                         : 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700'
                     }`}
                   >
-                    <CheckCircle className={`w-4 h-4 ${e.offerings?.admin_verified ? 'text-emerald-400' : 'text-neutral-500'}`} />
-                    {e.offerings?.admin_verified ? 'Verified' : 'Verify'}
+                    <CheckCircle className={`w-4 h-4 ${e.admin_verified ? 'text-emerald-400' : 'text-neutral-500'}`} />
+                    {e.admin_verified ? 'Verified' : 'Verify'}
                   </button>
                 </td>
                 <td className="px-6 py-4 text-right">
@@ -183,22 +189,13 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-neutral-400 mb-1">Host Venue (Name or Subroom)</label>
-                <input 
-                  type="text"
-                  value={editingEvent.venue_subroom || ''}
-                  onChange={e => setEditingEvent({...editingEvent, venue_subroom: e.target.value})}
-                  className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
-                  placeholder="e.g. London Music Hall"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-neutral-400 mb-1">Venue ID (Internal)</label>
+                <label className="block text-xs font-bold text-neutral-400 mb-1">Host Venue ID</label>
                 <input 
                   type="text"
                   value={editingEvent.venue_id || ''}
                   onChange={e => setEditingEvent({...editingEvent, venue_id: e.target.value})}
-                  className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 text-neutral-500"
+                  className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500"
+                  placeholder="e.g. v-london-music-hall"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -212,12 +209,13 @@ export default function EventManager({ initialEvents }: { initialEvents: EventRe
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-400 mb-1">End Time (ISO)</label>
+                  <label className="block text-xs font-bold text-neutral-400 mb-1">Best Link</label>
                   <input 
                     type="text"
-                    value={editingEvent.end_time || ''}
-                    onChange={e => setEditingEvent({...editingEvent, end_time: e.target.value})}
+                    value={editingEvent.best_link || ''}
+                    onChange={e => setEditingEvent({...editingEvent, best_link: e.target.value})}
                     className="w-full bg-black border border-neutral-800 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 text-sm"
+                    placeholder="https://..."
                   />
                 </div>
               </div>

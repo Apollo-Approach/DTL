@@ -16,21 +16,6 @@ interface NearbyOfferingsProps {
 import { calculateMatchScore } from '@/lib/matchScore';
 
 
-
-// Dynamic feed item from /api/promotions/feed
-interface FeedItem {
-  id: string;
-  title: string;
-  description: string;
-  discount_value: string;
-  venue_name: string;
-  venue_id: string;
-
-  recurring_day: string | null;
-  active_window: string;
-  distance_km: number | null;
-}
-
 // Default center: Richmond & Dundas intersection
 const DTL_CENTER = { lat: 42.9837, lng: -81.2497 };
 
@@ -46,33 +31,6 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
   };
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
 
-  const [liveFeed, setLiveFeed] = useState<FeedItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(false);
-
-  // Fetch live promo feed when situation tag changes
-  useEffect(() => {
-    const fetchFeed = async () => {
-      setFeedLoading(true);
-      try {
-        const params = new URLSearchParams({
-          lat: DTL_CENTER.lat.toString(),
-          lng: DTL_CENTER.lng.toString(),
-          limit: '15',
-        });
-        const res = await fetch(`/api/promotions/feed?${params}`);
-        if (res.ok) {
-          const data = await res.json();
-          setLiveFeed(data.feed || []);
-        }
-      } catch (err) {
-        console.error('Feed fetch error:', err);
-      } finally {
-        setFeedLoading(false);
-      }
-    };
-
-    fetchFeed();
-  }, []);
 
   // Compute matched venues — max 7, sorted by proximity or match score
   const displayVenues = useMemo(() => {
@@ -132,54 +90,28 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
           )}
         </h2>
 
-        {preferences && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setForYou(!forYou)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
-              forYou 
-                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.2)]' 
-                : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-zinc-500'
-            }`}
+            onClick={handleShuffle}
+            className="px-3 py-1.5 bg-neutral-800 text-white rounded-full hover:bg-neutral-700 transition font-bold text-xs flex items-center gap-2 border border-neutral-700 active:scale-95"
           >
-            🎯 For You
+            <span className={`inline-block ${isShuffling ? "animate-spin" : ""}`}>🔀</span> {isShuffling ? 'Shuffling...' : 'Shuffle'}
           </button>
-        )}
-      </div>
 
-      {/* Shuffle Button */}
-      <div className="flex pb-4">
-        <button
-          onClick={handleShuffle}
-          className="px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition font-bold text-sm flex items-center gap-2 border border-neutral-700 active:scale-95"
-        >
-          <span className={`inline-block ${isShuffling ? "animate-spin" : ""}`}>🔀</span> {isShuffling ? 'Shuffling...' : 'Shuffle Offers'}
-        </button>
-      </div>
-
-      {/* Live Feed Banner */}
-      {liveFeed.length > 0 && (
-        <div className="mb-4 p-4 bg-gradient-to-r from-purple-900/30 to-cyan-900/30 border border-purple-500/20 rounded-xl">
-          <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-            🔥 Live Tonight
-            {feedLoading && <span className="text-neutral-500 animate-pulse">updating...</span>}
-          </h3>
-          <div className="space-y-2">
-            {liveFeed.slice(0, 4).map(item => (
-              <div key={item.id} className="flex items-center justify-between gap-3 p-2 bg-neutral-900/60 rounded-lg hover:bg-neutral-800/60 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{item.discount_value}</p>
-                  <p className="text-xs text-neutral-400 truncate">{item.venue_name} · {item.active_window}</p>
-                </div>
-                {item.distance_km !== null && (
-                  <span className="text-[10px] text-neutral-500 font-bold shrink-0">
-                    {item.distance_km < 1 ? `${Math.round(item.distance_km * 1000)}m` : `${item.distance_km}km`}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+          {preferences && (
+            <button
+              onClick={() => setForYou(!forYou)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
+                forYou 
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.2)]' 
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-zinc-500'
+              }`}
+            >
+              🎯 For You
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {displayVenues.length === 0 && forYou ? (
         <div className="p-8 text-center bg-neutral-900 border border-neutral-800 rounded-xl">

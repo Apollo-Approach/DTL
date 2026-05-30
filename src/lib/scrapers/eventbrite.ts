@@ -42,48 +42,16 @@ async function fetchEventsForOrganizer(organizerId: string, apiKey: string): Pro
     const events: NormalizedEvent[] = [];
 
     for (const ebEvent of (data.events || [])) {
-      const isFree = ebEvent.is_free;
-      let minPrice = 0;
-
-      if (!isFree && ebEvent.ticket_classes) {
-        const paidTickets = ebEvent.ticket_classes.filter((tc: any) => !tc.free && tc.cost);
-        if (paidTickets.length > 0) {
-          minPrice = Math.min(...paidTickets.map((tc: any) => parseFloat(tc.cost.value || '0') / 100));
-        }
-      }
-
-      const category = EB_CATEGORY_MAP[ebEvent.category_id] || 'COMMUNITY';
-
-      let lat = 42.9849;
-      let lng = -81.2453;
-      if (ebEvent.venue && ebEvent.venue.latitude && ebEvent.venue.longitude) {
-        lat = parseFloat(ebEvent.venue.latitude);
-        lng = parseFloat(ebEvent.venue.longitude);
-      }
-
       const startTime = ebEvent.start.utc;
-      const endTime = ebEvent.end.utc;
       const sourceUrl = ebEvent.url;
-
+      
       events.push({
         id: generateId('eb', ebEvent.id),
         name: ebEvent.name.text,
         venue_id: null,
         start_time: startTime,
-        end_time: endTime,
-        is_free: isFree,
-        price: minPrice,
-        categories: [category],
-        description: ebEvent.description.text || '',
-        ticket_url: sourceUrl,
-        source_platform: 'eventbrite',
-        source_url: sourceUrl,
-        image_url: ebEvent.logo?.original?.url || null,
-        age_restriction: null,
-        door_time: null,
-        venue_subroom: ebEvent.venue?.name || null,
-        dedup_hash: dedupHash('eventbrite', sourceUrl, startTime),
-        location: `SRID=4326;POINT(${lng} ${lat})`
+        best_link: sourceUrl,
+        dedup_hash: dedupHash('eventbrite', sourceUrl, startTime)
       });
     }
 
@@ -140,10 +108,6 @@ async function fetchDirectoryEvents(): Promise<NormalizedEvent[]> {
             venueSubroom = schema.location.name || null;
           }
 
-          const isFree = schema.offers && schema.offers.price === '0.00';
-          const price = schema.offers && schema.offers.price ? parseFloat(schema.offers.price) : 0;
-
-          // Deterministic Geographic Resolution!
           const venue_id = matchEventToVenue(lat, lng);
 
           events.push({
@@ -151,20 +115,8 @@ async function fetchDirectoryEvents(): Promise<NormalizedEvent[]> {
             name: schema.name,
             venue_id, // Found via GeoJSON Map
             start_time: schema.startDate,
-            end_time: schema.endDate || new Date(new Date(schema.startDate).getTime() + 3 * 3600000).toISOString(),
-            is_free: isFree,
-            price: price,
-            categories: ['COMMUNITY'], // Default
-            description: schema.description || '',
-            ticket_url: schema.url || null,
-            source_platform: 'eventbrite',
-            source_url: schema.url || null,
-            image_url: schema.image || null,
-            age_restriction: null,
-            door_time: null,
-            venue_subroom: venueSubroom,
-            dedup_hash: dedupHash('eventbrite', schema.url || schema.name, schema.startDate),
-            location: `SRID=4326;POINT(${lng} ${lat})`
+            best_link: schema.url || null,
+            dedup_hash: dedupHash('eventbrite', schema.url || schema.name, schema.startDate)
           });
         });
       } catch (err) {
@@ -207,8 +159,7 @@ export async function fetchEventbriteHybrid(supabase: SupabaseClient): Promise<N
       // Force venue mapping since we know the organizer is tied to this venue
       return ebEvents.map(ev => ({
         ...ev,
-        venue_id: venue.id,
-        location: venue.location // Fallback to DB location
+        venue_id: venue.id
       }));
     });
 

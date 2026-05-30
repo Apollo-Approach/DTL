@@ -13,6 +13,6 @@ ADD COLUMN IF NOT EXISTS venue_id TEXT REFERENCES public.venues(id) ON DELETE SE
 CREATE POLICY "Venue managers can update their venue" ON public.venues
     FOR UPDATE USING (
         EXISTS (
-            SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'venue_manager' AND venue_id = public.venues.id
+            SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role::text = 'venue_manager' AND venue_id = public.venues.id
         )
     );

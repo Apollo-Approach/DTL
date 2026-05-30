@@ -82,25 +82,7 @@ export async function fetchTicketmasterEvents(apiKey: string): Promise<Normalize
       const localTime = (start?.localTime as string) || '20:00:00';
 
       const startTime = `${localDate}T${localTime}-04:00`; // EDT
-      const endTime = new Date(new Date(startTime).getTime() + 3 * 3600000).toISOString();
-
-      const priceRanges = event.priceRanges as Array<Record<string, unknown>> | undefined;
-      const minPrice = priceRanges?.[0]?.min as number ?? 0;
-      const isFree = minPrice === 0;
-
-      const classifications = event.classifications as Array<Record<string, unknown>> | undefined;
-      const genre = (classifications?.[0]?.genre as Record<string, unknown>)?.name as string | undefined;
-      const category = genre ? (GENRE_TO_CATEGORY[genre] || 'LIVE_MUSIC') : 'LIVE_MUSIC';
-
-      const images = event.images as Array<Record<string, unknown>> | undefined;
-      const bestImage = images?.find(img =>
-        (img.ratio === '16_9' || img.ratio === '3_2') &&
-        (img.width as number) >= 300 && (img.width as number) <= 800
-      );
-
       const sourceUrl = (event.url as string) || '';
-      const ageRestrictions = (event.ageRestrictions as Record<string, unknown> | undefined);
-      const ageMin = ageRestrictions?.legalAgeEnforced as boolean;
 
       const venueId = venue?.id as string | undefined;
 
@@ -118,20 +100,8 @@ export async function fetchTicketmasterEvents(apiKey: string): Promise<Normalize
         name: event.name as string,
         venue_id: finalVenueId,
         start_time: startTime,
-        end_time: endTime,
-        is_free: isFree,
-        price: minPrice,
-        categories: [category],
-        description: (event.info as string) || (event.pleaseNote as string) || '',
-        ticket_url: sourceUrl || null,
-        source_platform: 'ticketmaster',
-        source_url: sourceUrl || null,
-        image_url: (bestImage?.url || images?.[0]?.url || null) as string | null,
-        age_restriction: ageMin ? '19+' : null,
-        door_time: null,
-        venue_subroom: null,
+        best_link: sourceUrl || null,
         dedup_hash: dedupHash('ticketmaster', sourceUrl, startTime),
-        location: `SRID=4326;POINT(${lng} ${lat})`,
       };
     });
   } catch (err) {

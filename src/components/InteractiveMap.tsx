@@ -195,7 +195,7 @@ export default function InteractiveMap({ venues = [], incidents = [], events = [
   });
 
   useVenueMarkers(mapRef, venues, promos, events, '', forYou, preferences, activeCategories, false);
-  useEventMarkers(mapRef, events, '', '', layerToggles, preferences);
+  useEventMarkers(mapRef, events, venues, '', '', layerToggles, preferences);
   useIncidentMarkers(mapRef, incidents, localIncidentUpdates, layerToggles, userRole, timeFilter, mode, setSelectedIncident);
 
 
