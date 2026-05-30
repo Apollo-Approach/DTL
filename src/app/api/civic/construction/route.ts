@@ -9,8 +9,8 @@
 
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 300; // Cache for 5 minutes
+
+export const revalidate = 3600; // Cache for 1 hour
 
 interface ConstructionProject {
   id: string;
@@ -46,7 +46,6 @@ async function fetchArcGISClosures(): Promise<ConstructionProject[]> {
 
     const response = await fetch(`${ARCGIS_ROAD_CLOSURES_URL}?${params}`, {
       signal: controller.signal,
-      cache: 'no-store',
       headers: {
         'User-Agent': 'DTL-CivicAdvisory/1.0'
       }

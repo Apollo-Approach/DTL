@@ -583,6 +583,7 @@ export default function ClientMapDebug({ venues }: ClientMapDebugProps) {
     const LERP_INTERVAL = 15_000; // match prod polling
 
     const fetchBuses = async () => {
+      if (document.hidden) return;
       try {
         const res = await fetch('/api/civic/transit');
         if (!res.ok) return;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export const revalidate = 60; // Cache for 60 seconds — alerts don't change frequently
+
+export const revalidate = 300;
 
 interface TransitAlert {
   id: string;
@@ -62,9 +63,7 @@ export async function GET() {
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cache-Control': 'no-cache',
         },
-        cache: 'no-store',
         signal: controller.signal,
       }
     );

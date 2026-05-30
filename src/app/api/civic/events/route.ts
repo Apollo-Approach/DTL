@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export const dynamic = 'force-dynamic';
+
 export const revalidate = 600; // Cache for 10 minutes
 
 interface EventData {
@@ -127,7 +127,6 @@ async function fetchTicketmasterEvents(apiKey: string): Promise<EventData[]> {
 
   const response = await fetch(`${TICKETMASTER_BASE}/events.json?${params}`, {
     signal: controller.signal,
-    cache: 'no-store',
     headers: { 'User-Agent': 'DTL-EventPipeline/1.0' }
   });
 

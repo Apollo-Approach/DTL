@@ -363,72 +363,78 @@ export function useMapInit({
           map.addSource('transit-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
 
-        const fetchLiveTransit = async () => {
+        const fetchTransitBuses = async () => {
+          if (document.hidden) return;
           try {
-            const [transitRes, parkingRes] = await Promise.all([ fetch('/api/civic/transit'), fetch('/api/civic/parking') ]);
-
-            // Fetch transit alerts less frequently (merged into polling but lightweight)
-            fetch('/api/civic/transit/alerts').then(r => r.json()).then(d => {
-              if (d.routeAlerts) routeAlertsRef.current = d.routeAlerts;
-            }).catch(() => {});
+            const transitRes = await fetch('/api/civic/transit');
+            if (!transitRes.ok) return;
+            const data = await transitRes.json();
+            const activeIds = new Set(data.buses.map((b: BusState) => b.id));
             
-            if (transitRes.ok) {
-              const data = await transitRes.json();
-              const activeIds = new Set(data.buses.map((b: BusState) => b.id));
+            // Update targets for interpolation
+            const now = Date.now();
+            data.buses.forEach((bus: BusState) => {
+              const existing = busStateRef.current[bus.id];
               
-              // Update targets for interpolation
-              const now = Date.now();
-              data.buses.forEach((bus: BusState) => {
-                const existing = busStateRef.current[bus.id];
-                
-                let startLng = existing ? existing.currentLng : bus.targetLng;
-                let startLat = existing ? existing.currentLat : bus.targetLat;
-                let tLng = bus.targetLng;
-                let tLat = bus.targetLat;
+              let startLng = existing ? existing.currentLng : bus.targetLng;
+              let startLat = existing ? existing.currentLat : bus.targetLat;
+              let tLng = bus.targetLng;
+              let tLat = bus.targetLat;
 
-                // PREDICTIVE INITIALIZATION: 
-                // If the bus is newly loaded (e.g. first page load) and is moving,
-                // project its destination 15 seconds forward so it starts gliding instantly
-                // instead of sitting frozen waiting for the second ping.
-                if (!existing && bus.speed > 0) {
-                   const R = 6371; // Earth's radius in km
-                   const distanceKm = (bus.speed * 15) / 1000;
-                   const rLat = bus.targetLat * Math.PI / 180;
-                   const rLng = bus.targetLng * Math.PI / 180;
-                   const rBearing = bus.bearing * Math.PI / 180;
+              // PREDICTIVE INITIALIZATION: 
+              if (!existing && bus.speed > 0) {
+                 const R = 6371; // Earth's radius in km
+                 const distanceKm = (bus.speed * 15) / 1000;
+                 const rLat = bus.targetLat * Math.PI / 180;
+                 const rLng = bus.targetLng * Math.PI / 180;
+                 const rBearing = bus.bearing * Math.PI / 180;
 
-                   const pLat = Math.asin(Math.sin(rLat) * Math.cos(distanceKm/R) + Math.cos(rLat) * Math.sin(distanceKm/R) * Math.cos(rBearing));
-                   const pLng = rLng + Math.atan2(Math.sin(rBearing) * Math.sin(distanceKm/R) * Math.cos(rLat), Math.cos(distanceKm/R) - Math.sin(rLat) * Math.sin(pLat));
-                   
-                   tLng = pLng * 180 / Math.PI;
-                   tLat = pLat * 180 / Math.PI;
-                }
-
-                busStateRef.current[bus.id] = {
-                  ...bus,
-                  startLng: startLng,
-                  startLat: startLat,
-                  currentLng: startLng,
-                  currentLat: startLat,
-                  targetLng: tLng,
-                  targetLat: tLat,
-                  startTime: now
-                };
-              });
-              
-              // Cleanup stale buses that went offline
-              for (const id in busStateRef.current) {
-                if (!activeIds.has(id)) delete busStateRef.current[id];
+                 const pLat = Math.asin(Math.sin(rLat) * Math.cos(distanceKm/R) + Math.cos(rLat) * Math.sin(distanceKm/R) * Math.cos(rBearing));
+                 const pLng = rLng + Math.atan2(Math.sin(rBearing) * Math.sin(distanceKm/R) * Math.cos(rLat), Math.cos(distanceKm/R) - Math.sin(rLat) * Math.sin(pLat));
+                 
+                 tLng = pLng * 180 / Math.PI;
+                 tLat = pLat * 180 / Math.PI;
               }
-            }
 
+              busStateRef.current[bus.id] = {
+                ...bus,
+                startLng: startLng,
+                startLat: startLat,
+                currentLng: startLng,
+                currentLat: startLat,
+                targetLng: tLng,
+                targetLat: tLat,
+                startTime: now
+              };
+            });
+            
+            // Cleanup stale buses that went offline
+            for (const id in busStateRef.current) {
+              if (!activeIds.has(id)) delete busStateRef.current[id];
+            }
+          } catch (err) {
+            console.error("Transit Polling Error:", err);
+          }
+        };
+
+        const fetchParkingData = async () => {
+          if (document.hidden) return;
+          try {
+            const parkingRes = await fetch('/api/civic/parking');
             if (parkingRes.ok) {
               const parkingData = await parkingRes.json();
               (map.getSource('parking-source') as maplibregl.GeoJSONSource)?.setData(parkingData);
             }
           } catch (err) {
-            console.error("Civic Polling Error:", err);
+            console.error("Parking Polling Error:", err);
           }
+        };
+
+        const fetchTransitAlerts = () => {
+          if (document.hidden) return;
+          fetch('/api/civic/transit/alerts').then(r => r.json()).then(d => {
+            if (d.routeAlerts) routeAlertsRef.current = d.routeAlerts;
+          }).catch(() => {});
         };
 
         const renderFrame = () => {
@@ -518,8 +524,12 @@ export function useMapInit({
         };
 
         // Start engines
-        fetchLiveTransit();
-        const civicInterval = setInterval(fetchLiveTransit, 15000); // 15 seconds
+        fetchTransitBuses();
+        fetchParkingData();
+        fetchTransitAlerts();
+        const transitInterval = setInterval(fetchTransitBuses, 15000); // 15 seconds
+        const parkingInterval = setInterval(fetchParkingData, 180000); // 3 minutes
+        const alertsInterval = setInterval(fetchTransitAlerts, 300000); // 5 minutes
         animationFrameRef.current = requestAnimationFrame(renderFrame);
 
         // --- 3. CLICK INTERACTIONS UPDATED IDs ---
@@ -781,7 +791,9 @@ export function useMapInit({
 
         // Cleanup
         map.on('remove', () => {
-          clearInterval(civicInterval);
+          clearInterval(transitInterval);
+          clearInterval(parkingInterval);
+          clearInterval(alertsInterval);
 
           if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
           stopShimmerAnimation();

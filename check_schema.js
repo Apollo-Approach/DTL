@@ -1,15 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
+require('dotenv').config({ path: '.env.local' });
+const { createClient } = require('@supabase/supabase-js');
 
-dotenv.config({ path: '.env.local' })
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-const supabase = createClient(supabaseUrl, supabaseKey)
-
-async function checkSchema() {
-  const { data, error } = await supabase.rpc('get_schema') // Wait, standard supabase doesn't have this.
-  // Instead, run a generic SQL? Supabase REST API doesn't expose raw SQL directly.
+async function run() {
+  const { data, error } = await supabase.from('venues').select('*').limit(1);
+  if (data) {
+    console.log(Object.keys(data[0]));
+  }
 }
-checkSchema()
+run();

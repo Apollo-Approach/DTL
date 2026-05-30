@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
 
-export const revalidate = 300; // Cache for 5 minutes
+export const revalidate = 60; // Cache for 1 minute
 
 export async function GET() {
   try {
