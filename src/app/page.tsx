@@ -70,7 +70,7 @@ export default async function Home() {
       <Script
         id="schema-org-venues"
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
 
       <header className="mb-4 relative z-50">
