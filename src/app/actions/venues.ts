@@ -1,9 +1,27 @@
 'use server';
 
-import { createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+async function verifyAdmin() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return false;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  return profile?.role === 'sysadmin' || profile?.role === 'm5_sysadmin';
+}
+
 export async function saveVenue(payload: any, venueId?: string) {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: 'Unauthorized. Admin access required.' };
+  }
+
   console.log("saveVenue called with venueId:", venueId);
   console.log("payload:", payload);
   const adminSupabase = await createAdminClient();
@@ -41,6 +59,10 @@ export async function saveVenue(payload: any, venueId?: string) {
 }
 
 export async function deleteVenue(venueId: string) {
+  if (!(await verifyAdmin())) {
+    return { success: false, error: 'Unauthorized. Admin access required.' };
+  }
+
   const adminSupabase = await createAdminClient();
   try {
     const { error } = await adminSupabase

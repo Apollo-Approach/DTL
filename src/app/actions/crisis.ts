@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 
 export async function verifyCrisisPin(pin: string) {
   // Use a private server-only env variable if possible, fallback to the public one if that's all there is
-  const correctPin = process.env.CRISIS_PIN || process.env.NEXT_PUBLIC_CRISIS_PIN || '';
+  const correctPin = process.env.CRISIS_PIN || '';
   
   if (pin && pin === correctPin) {
     // Set an HTTP-only cookie so the unlocked state persists securely across reloads
