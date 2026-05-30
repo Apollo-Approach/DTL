@@ -66,8 +66,12 @@ def _browserless_single_page(url, venue_name):
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp("ws://browserless:3000")
             page = browser.new_page()
-            page.goto(url, timeout=20000)
-            page.wait_for_load_state("domcontentloaded", timeout=10000)
+            page.goto(url, timeout=30000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                page.wait_for_load_state("domcontentloaded", timeout=5000)
+            page.wait_for_timeout(2000)
             text = page.locator("body").inner_text()
             page.close()
             browser.close()
@@ -179,12 +183,21 @@ def _scrape_spa_fallback(venue_name, website_url):
                     break
                 try:
                     sub_page = browser.new_page()
-                    sub_page.goto(url, timeout=20000)
-                    sub_page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    sub_page.goto(url, timeout=30000)
+                    # Use networkidle for JS-heavy sites — domcontentloaded isn't enough
+                    try:
+                        sub_page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        # networkidle can timeout on long-polling sites, fall back
+                        sub_page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    # Extra wait for late-rendering JS frameworks
+                    sub_page.wait_for_timeout(2000)
                     sub_text = sub_page.locator("body").inner_text()
                     if len(sub_text) > 50:
                         sections.append(f"\n--- SUB-PAGE ({url}) ---\n{sub_text[:5000]}\n")
                         logger.info(f"Browserless deep dive got {len(sub_text)} chars from {url}")
+                    else:
+                        logger.warning(f"Browserless deep dive got only {len(sub_text)} chars from {url} — page may be JS-rendered or blocked")
                     sub_page.close()
                     dives_completed += 1
                 except Exception as e:
