@@ -72,12 +72,26 @@ export function useVenueMarkers(
       let emoji = categoryEmoji[category] || '📍';
       
       if (isHQ) emoji = 'HQ';
-      else if (hasEvent) emoji = '🎟️';
-      else if (hasActiveSpecials) emoji = '$';
+
+      const eventBadge = hasEvent ? `
+        <div style="position: absolute; bottom: -4px; left: -8px; width: 18px; height: 18px; border-radius: 50%; background: #ff00ff; border: 1.5px solid white; display: flex; align-items: center; justify-content: center; font-size: 10px; z-index: 10;">
+          🎟️
+        </div>
+      ` : '';
+
+      const specialBadge = hasActiveSpecials ? `
+        <div style="position: absolute; bottom: -4px; right: -8px; width: 18px; height: 18px; border-radius: 50%; background: #ffff00; border: 2px solid #00ff00; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: black; z-index: 10;">
+          $
+        </div>
+      ` : '';
 
       el.innerHTML = `
-        <div style="width:28px;height:28px;border-radius:50%;background:${isHQ ? '#22c55e' : markerColor};border:2px solid rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;font-size:${isHQ ? '10px' : '14px'};font-weight:bold;color:white;box-shadow:0 2px 8px ${isHQ ? '#22c55e' : markerColor}88;transition:transform 0.2s;">
-          ${emoji}
+        <div style="position: relative; width: 28px; height: 28px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:${isHQ ? '#22c55e' : markerColor};border:2px solid rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;font-size:${isHQ ? '10px' : '14px'};font-weight:bold;color:white;box-shadow:0 2px 8px ${isHQ ? '#22c55e' : markerColor}88;transition:transform 0.2s; position: relative; z-index: 5;">
+            ${emoji}
+          </div>
+          ${eventBadge}
+          ${specialBadge}
         </div>`;
 
       const hqLinks = isHQ ? `<div style="margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px;"><a href="/about" style="display:block; margin-bottom: 4px; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">ℹ️ About & FAQ</a><a href="/contact" style="display:block; font-size: 12px; color: #22c55e; font-weight: bold; text-decoration: none;">📞 Contact Us</a></div>` : '';
