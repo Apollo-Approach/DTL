@@ -3,6 +3,46 @@
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+async function fetchBuildingFootprint(lat: number, lng: number) {
+  try {
+    const baseUrl = 'https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query';
+    const params = new URLSearchParams({
+      geometry: `${lng},${lat}`,
+      geometryType: 'esriGeometryPoint',
+      spatialRel: 'esriSpatialRelIntersects',
+      outFields: '*',
+      returnGeometry: 'true',
+      f: 'geojson',
+      inSR: '4326',
+      outSR: '4326'
+    });
+    
+    const res = await fetch(`${baseUrl}?${params.toString()}`);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    if (data.features && data.features.length > 0) {
+      // Return the exact geometry
+      return data.features[0].geometry;
+    }
+  } catch (err) {
+    console.error('Failed to fetch building footprint:', err);
+  }
+  
+  // Synthetic fallback (10x10m square) if MapServer fails or returns empty
+  const d = 0.0001; 
+  return {
+    type: "Polygon",
+    coordinates: [[
+      [lng - d, lat - d],
+      [lng + d, lat - d],
+      [lng + d, lat + d],
+      [lng - d, lat + d],
+      [lng - d, lat - d]
+    ]]
+  };
+}
+
 async function verifyAdmin() {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -28,6 +68,16 @@ export async function saveVenue(payload: any, venueId?: string) {
   console.log("adminSupabase created");
 
   try {
+      if (payload.location && typeof payload.location === 'string') {
+        const match = payload.location.match(/POINT\(([^ ]+) ([^)]+)\)/);
+        if (match) {
+          const lng = parseFloat(match[1]);
+          const lat = parseFloat(match[2]);
+          payload.offerings = payload.offerings || {};
+          payload.offerings.building_footprint = await fetchBuildingFootprint(lat, lng);
+        }
+      }
+
       if (venueId) {
         const { error } = await adminSupabase
           .from('venues')

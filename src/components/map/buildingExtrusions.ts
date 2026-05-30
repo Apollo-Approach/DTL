@@ -270,7 +270,7 @@ let cachedCivicGeoJSON: GeoJSON.FeatureCollection | null = null;
 
 export async function matchVenuesToBuildings(
   map: maplibregl.Map,
-  venues: Array<{ id: string; lng: number; lat: number; category: string; hasSpecials: boolean }>,
+  venues: Array<{ id: string; lng: number; lat: number; category: string; hasSpecials: boolean; building_footprint?: any }>,
 ): Promise<void> {
   if (!map.getLayer('osm-3d-buildings')) return;
 
@@ -286,50 +286,31 @@ export async function matchVenuesToBuildings(
   state.matchedBuildings.clear();
   state.shimmerBuildings.clear();
 
-  if (!cachedCivicGeoJSON) {
-    try {
-      const res = await fetch('/civic_data/civic_venue_buildings.geojson');
-      cachedCivicGeoJSON = await res.json();
-    } catch (err) {
-      console.error('Failed to load civic building footprints', err);
-      return;
-    }
-  }
-
   const buildingFeatures: GeoJSON.Feature[] = [];
   const glowFeatures: GeoJSON.Feature[] = [];
-
-  // Map the civic features by venue_id for quick lookup
-  const civicFeaturesByVenue = new Map<string, GeoJSON.Feature>();
-  if (cachedCivicGeoJSON?.features) {
-    for (const f of cachedCivicGeoJSON.features) {
-      if (f.properties?.venue_id) {
-        civicFeaturesByVenue.set(f.properties.venue_id, f);
-      }
-    }
-  }
-
   const geomHashes = new Map<string, number>();
 
   venues.forEach((venue) => {
     const color = VENUE_COLORS[venue.category] || VENUE_COLORS.default;
-    const sourceFeature = civicFeaturesByVenue.get(venue.id);
+    
+    // Use the real-time building footprint stored on the venue
+    const footprintGeometry = venue.building_footprint;
 
-    if (sourceFeature && sourceFeature.geometry) {
-      const hash = JSON.stringify(sourceFeature.geometry);
+    if (footprintGeometry) {
+      const hash = JSON.stringify(footprintGeometry);
       let customFeatureId = geomHashes.get(hash);
 
       if (customFeatureId === undefined) {
         customFeatureId = state.nextFeatureId++;
         geomHashes.set(hash, customFeatureId);
 
-        const renderHeight = sourceFeature.properties?.height || sourceFeature.properties?.HEIGHT || 10;
+        const renderHeight = footprintGeometry.properties?.height || footprintGeometry.properties?.HEIGHT || 10;
         const renderBase = 0;
 
         const newFeature: GeoJSON.Feature = {
           type: 'Feature',
           id: customFeatureId,
-          geometry: sourceFeature.geometry,
+          geometry: footprintGeometry,
           properties: {
             venueId: venue.id,
             venueColor: ENABLE_VENUE_COLORING ? color : '#64748b',

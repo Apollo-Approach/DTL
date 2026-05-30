@@ -127,6 +127,7 @@ export interface Habits {
 
 export interface Offerings {
   maps_grounding_lite?: Record<string, unknown>;
+  building_footprint?: any;
 }
 
 export interface Preferences {
@@ -134,5 +135,4 @@ export interface Preferences {
   cuisine?: string[];
 
   habits?: Habits;
-  autoRoute?: boolean;
 }

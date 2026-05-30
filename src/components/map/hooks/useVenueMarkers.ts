@@ -116,6 +116,7 @@ export function useVenueMarkers(
         lat: venue.lat,
         category,
         hasSpecials: promos.some(p => p.venue_id === venue.id),
+        building_footprint: venue.offerings?.building_footprint
       };
     });
 
