@@ -96,7 +96,7 @@ export function useEventMarkers(
           ${count > 1 ? `<span style="position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;background:#fff;color:#db2777;border-radius:8px;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;padding:0 3px;box-shadow:0 1px 3px rgba(0,0,0,0.3);border:1.5px solid #db2777;">${count}</span>` : ''}
         </div>`;
 
-      if (preferences?.autoRoute) {
+      if ((preferences as any)?.autoRoute) {
         el.addEventListener('click', () => {
           (window as unknown as { requestSafeWalk: (lng: number, lat: number) => void }).requestSafeWalk(cluster.lng, cluster.lat);
         });
