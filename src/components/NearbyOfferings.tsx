@@ -15,26 +15,7 @@ interface NearbyOfferingsProps {
 
 import { calculateMatchScore } from '@/lib/matchScore';
 
-// Situation filter chips — the "Search by Situation" UX (Sprint 3.3)
-const SITUATION_CHIPS = [
-  { tag: 'cheap-drinks', icon: '🍻', label: 'Cheap Drinks', color: 'amber' },
-  { tag: 'live-music', icon: '🎵', label: 'Live Music', color: 'pink' },
-  { tag: 'late-night', icon: '🌙', label: 'Late Night', color: 'indigo' },
-  { tag: 'no-cover', icon: '🚫', label: 'No Cover', color: 'emerald' },
-  { tag: 'patio', icon: '☀️', label: 'Patios', color: 'yellow' },
-  { tag: 'date-night', icon: '💕', label: 'Date Night', color: 'rose' },
-  { tag: 'student-friendly', icon: '🎓', label: 'Student', color: 'blue' },
-] as const;
 
-const CHIP_COLORS: Record<string, { active: string; inactive: string }> = {
-  amber: { active: 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  pink: { active: 'bg-pink-500/20 text-pink-400 border-pink-500/50 shadow-[0_0_10px_rgba(236,72,153,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  indigo: { active: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50 shadow-[0_0_10px_rgba(99,102,241,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  emerald: { active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  yellow: { active: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  rose: { active: 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-  blue: { active: 'bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.15)]', inactive: 'bg-neutral-900 text-neutral-500 border-neutral-700 hover:border-neutral-600' },
-};
 
 // Dynamic feed item from /api/promotions/feed
 interface FeedItem {
@@ -44,7 +25,7 @@ interface FeedItem {
   discount_value: string;
   venue_name: string;
   venue_id: string;
-  situation_tags: string[];
+
   recurring_day: string | null;
   active_window: string;
   distance_km: number | null;
@@ -64,7 +45,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
     setTimeout(() => setIsShuffling(false), 300);
   };
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
-  const [activeSituationTag, setActiveSituationTag] = useState<string | null>(null);
+
   const [liveFeed, setLiveFeed] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
 
@@ -78,9 +59,6 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
           lng: DTL_CENTER.lng.toString(),
           limit: '15',
         });
-        if (activeSituationTag) {
-          params.set('tags', activeSituationTag);
-        }
         const res = await fetch(`/api/promotions/feed?${params}`);
         if (res.ok) {
           const data = await res.json();
@@ -94,7 +72,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
     };
 
     fetchFeed();
-  }, [activeSituationTag]);
+  }, []);
 
   // Compute matched venues — max 7, sorted by proximity or match score
   const displayVenues = useMemo(() => {
@@ -106,17 +84,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
 
     let filtered = venues;
 
-    // Situation tag filter — show only venues with matching tags
-    if (activeSituationTag) {
-      filtered = venues.filter(v => {
-        const tags = v.situation_tags || [];
-        // Also check if any promo for this venue matches the tag
-        const promoTagMatch = promos.some(p =>
-          p.venue_id === v.id && (p.situation_tags || []).includes(activeSituationTag)
-        );
-        return tags.includes(activeSituationTag) || promoTagMatch;
-      });
-    }
+
 
     if (forYou && preferences) {
       return filtered
@@ -150,7 +118,7 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
     return [...filtered]
       .sort((a, b) => scoreVenue(b) - scoreVenue(a))
       .slice(0, 10);
-  }, [venues, preferences, forYou, activeSituationTag, promos, shuffleSeed]);
+  }, [venues, preferences, forYou, promos, shuffleSeed]);
 
   return (
     <section className="w-full min-w-0 overflow-hidden">
@@ -188,8 +156,8 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
         </button>
       </div>
 
-      {/* Live Feed Banner — shows when situation tag is active */}
-      {activeSituationTag && liveFeed.length > 0 && (
+      {/* Live Feed Banner */}
+      {liveFeed.length > 0 && (
         <div className="mb-4 p-4 bg-gradient-to-r from-purple-900/30 to-cyan-900/30 border border-purple-500/20 rounded-xl">
           <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             🔥 Live Tonight
@@ -213,16 +181,13 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
         </div>
       )}
 
-      {displayVenues.length === 0 && (forYou || activeSituationTag) ? (
+      {displayVenues.length === 0 && forYou ? (
         <div className="p-8 text-center bg-neutral-900 border border-neutral-800 rounded-xl">
           <p className="text-neutral-400">
-            {activeSituationTag 
-              ? `No venues match "${activeSituationTag.replace(/-/g, ' ')}" right now.`
-              : 'No high-match venues found for your specific preferences right now.'
-            }
+            No high-match venues found for your specific preferences right now.
           </p>
           <button 
-            onClick={() => { setForYou(false); setActiveSituationTag(null); }} 
+            onClick={() => { setForYou(false); }} 
             className="mt-4 text-cyan-400 font-bold underline"
           >
             Show all venues
@@ -235,7 +200,6 @@ export default function NearbyOfferings({ venues, promos, events = [], preferenc
             const venueEvents = events.filter(e => e.venue_id === venue.id);
             const upcomingCount = venueEvents.filter(e => new Date(e.start_time) >= new Date()).length;
             const isPopUp = venue.status === 'POP_UP';
-            const tags = venue.situation_tags || [];
             
             return (
               <motion.li 

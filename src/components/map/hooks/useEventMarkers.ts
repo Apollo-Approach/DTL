@@ -9,7 +9,7 @@ function injectEventMarkerStyles() {
   if (styleInjected) return;
   const style = document.createElement('style');
   style.textContent = `
-    .event-cluster-marker { z-index: 9999 !important; }
+    .event-cluster-marker { z-index: 150 !important; }
     .event-cluster-marker > div:hover { transform: scale(1.12); }
   `;
   document.head.appendChild(style);

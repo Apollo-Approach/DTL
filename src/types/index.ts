@@ -29,7 +29,6 @@ export const VenueSchema = z.object({
   website_url: z.string().optional(),
   late_night_eligible: z.boolean().optional(),
   offerings: z.any().optional(),
-  situation_tags: z.array(z.string()).optional(),
 });
 
 export const NormalizedEventSchema = z.object({
@@ -131,7 +130,6 @@ export interface Promotion {
   active_until_time?: string; // HH:MM
   source_platform?: string;
   source_url?: string;
-  situation_tags?: string[];
 }
 
 export interface Habits {
@@ -141,14 +139,13 @@ export interface Habits {
 }
 
 export interface Offerings {
-  vibe_analysis?: string;
   maps_grounding_lite?: Record<string, unknown>;
 }
 
 export interface Preferences {
   drinks?: string[];
   cuisine?: string[];
-  vibe?: string[];
+
   habits?: Habits;
   autoRoute?: boolean;
 }

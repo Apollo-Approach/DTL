@@ -9,8 +9,7 @@ import { createClient } from '@supabase/supabase-js';
  * Query flow:
  *   1. Get current day of week + time
  *   2. Query promotions where recurring_day matches today AND active time window
- *   3. Filter by situation_tags matching time-aware relevance
- *   4. Sort by proximity to user (if location provided)
+ *   3. Sort by proximity to user (if location provided)
  *   5. Return ranked feed with venue metadata
  *
  * @see Research/Competitive Platform Analysis for DTL.md
@@ -33,7 +32,7 @@ export async function GET(request: Request) {
     const userLat = parseFloat(searchParams.get('lat') || '42.9849');
     const userLng = parseFloat(searchParams.get('lng') || '-81.2453');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
-    const tagsFilter = searchParams.get('tags')?.split(',').filter(Boolean) || [];
+
 
     // ── Temporal context ──
     const now = new Date();
@@ -55,17 +54,13 @@ export async function GET(request: Request) {
         recurring_day,
         active_from_time,
         active_until_time,
-        situation_tags,
         source_platform,
         source_url
       `)
       .or(`recurring_day.eq.${currentDay},recurring_day.is.null`)
       .gt('active_until', now.toISOString());
 
-    // If specific tags requested, filter using overlap
-    if (tagsFilter.length > 0) {
-      query = query.overlaps('situation_tags', tagsFilter);
-    }
+
 
     const { data: promotions, error: promoError } = await query.limit(limit * 2); // Fetch extra for post-filtering
 
@@ -100,17 +95,17 @@ export async function GET(request: Request) {
 
     // ── Fetch venue details for matched promotions ──
     const venueIds = [...new Set(timeFiltered.map(p => p.venue_id).filter(Boolean))];
-    let venueMap: Record<string, { name: string; lat: number; lng: number; situation_tags?: string[] }> = {};
+    let venueMap: Record<string, { name: string; lat: number; lng: number }> = {};
 
     if (venueIds.length > 0) {
       const { data: venues } = await supabase
         .from('venues_public')
-        .select('id, name, lat, lng, situation_tags')
+        .select('id, name, lat, lng')
         .in('id', venueIds);
 
       if (venues) {
         venueMap = Object.fromEntries(
-          venues.map(v => [v.id, { name: v.name, lat: v.lat, lng: v.lng, situation_tags: v.situation_tags }])
+          venues.map(v => [v.id, { name: v.name, lat: v.lat, lng: v.lng }])
         );
       }
     }
@@ -133,8 +128,6 @@ export async function GET(request: Request) {
           discount_value: promo.discount_value,
           venue_name: venue?.name || 'Unknown Venue',
           venue_id: promo.venue_id,
-          situation_tags: promo.situation_tags || [],
-          venue_tags: venue?.situation_tags || [],
           recurring_day: promo.recurring_day,
           active_window: promo.active_from_time && promo.active_until_time
             ? `${promo.active_from_time}–${promo.active_until_time}`
@@ -162,7 +155,7 @@ export async function GET(request: Request) {
         day: currentDay,
         time: currentTime,
         user_location: { lat: userLat, lng: userLng },
-        tags_applied: tagsFilter.length > 0 ? tagsFilter : 'all',
+
       },
       lastUpdated: now.toISOString(),
     });

@@ -222,42 +222,23 @@ export default async function VenueProfile({ params }: { params: Promise<{ id: s
           </div>
         </header>
 
-        {/* Deep-Dive Intel (Hybrid Pipeline) */}
-        {(venue.offerings?.vibe_analysis || venue.offerings?.pricing_intel || (venue.offerings?.menu_highlights && venue.offerings.menu_highlights.length > 0)) && (
+        {/* Menu Highlights */}
+        {venue.offerings?.menu_highlights && venue.offerings.menu_highlights.length > 0 && (
           <section className="mb-16">
             <div className="flex items-end justify-between mb-8 pb-4 border-b border-white/10">
-              <h2 className="text-3xl font-black uppercase tracking-tight">The Vibe & Intel</h2>
+              <h2 className="text-3xl font-black uppercase tracking-tight">Menu Highlights</h2>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {venue.offerings?.vibe_analysis && (
-                <div className="bg-zinc-900/60 border border-zinc-800 p-6">
-                  <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-widest mb-4">Vibe Analysis</h3>
-                  <p className="text-zinc-300 leading-relaxed">{venue.offerings.vibe_analysis}</p>
-                </div>
-              )}
-              
-              <div className="flex flex-col gap-8">
-                {venue.offerings?.pricing_intel && (
-                  <div className="bg-zinc-900/60 border border-zinc-800 p-6">
-                    <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest mb-4">Pricing & Cover</h3>
-                    <p className="text-zinc-300 leading-relaxed">{venue.offerings.pricing_intel}</p>
-                  </div>
-                )}
-                
-                {venue.offerings?.menu_highlights && venue.offerings.menu_highlights.length > 0 && (
-                  <div className="bg-zinc-900/60 border border-zinc-800 p-6">
-                    <h3 className="text-sm font-bold text-orange-400 uppercase tracking-widest mb-4">Menu Highlights</h3>
-                    <ul className="list-none space-y-2">
-                      {venue.offerings.menu_highlights.map((item: string, i: number) => (
-                        <li key={i} className="text-zinc-300 flex items-start gap-2">
-                          <span className="text-orange-400">❖</span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+            <div className="grid grid-cols-1 gap-8">
+              <div className="bg-zinc-900/60 border border-zinc-800 p-6">
+                <ul className="list-none space-y-2">
+                  {venue.offerings.menu_highlights.map((item: string, i: number) => (
+                    <li key={i} className="text-zinc-300 flex items-start gap-2">
+                      <span className="text-orange-400">❖</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </section>

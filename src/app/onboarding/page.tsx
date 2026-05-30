@@ -15,7 +15,7 @@ function OnboardingWizard() {
   const [preferences, setPreferences] = useState({
     drinks: [] as string[],
     cuisine: [] as string[],
-    vibe: [] as string[],
+
     habits: { affordability: '$$', schedule: 'late-night' },
   });
 
@@ -26,7 +26,7 @@ function OnboardingWizard() {
         setPreferences({
           drinks: profile.preferences.drinks || [],
           cuisine: profile.preferences.cuisine || [],
-          vibe: profile.preferences.vibe || [],
+
           habits: profile.preferences.habits || { affordability: '$$', schedule: 'late-night' },
         });
       }
@@ -39,7 +39,7 @@ function OnboardingWizard() {
     return <div className="min-h-screen bg-black flex items-center justify-center text-cyan-400 font-bold uppercase tracking-widest text-sm animate-pulse">Loading Profile...</div>;
   }
 
-  const handleMultiSelect = (category: 'drinks' | 'cuisine' | 'vibe', option: string) => {
+  const handleMultiSelect = (category: 'drinks' | 'cuisine', option: string) => {
     setPreferences((prev) => {
       const current = prev[category];
       if (current.includes(option)) {
@@ -68,7 +68,7 @@ function OnboardingWizard() {
   };
 
   const nextStep = () => {
-    if (step < 4) setStep(step + 1);
+    if (step < 3) setStep(step + 1);
     else submitPreferences();
   };
 
@@ -76,7 +76,7 @@ function OnboardingWizard() {
     <div className="min-h-screen bg-black text-white p-6 font-sans flex flex-col justify-between selection:bg-cyan-500 selection:text-white">
       {/* Progress Bar */}
       <div className="w-full flex gap-2 mb-8 mt-4">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3].map((i) => (
           <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-cyan-400' : 'bg-white/10'}`} />
         ))}
       </div>
@@ -127,28 +127,6 @@ function OnboardingWizard() {
         )}
 
         {step === 3 && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What&apos;s the frequency?</h1>
-            <p className="text-zinc-400 text-sm mb-8 font-medium">Choose your ideal atmosphere.</p>
-            <div className="grid grid-cols-2 gap-4">
-              {['Live Bands', 'DJs / Electronic', 'Chill Lounge', 'High Energy'].map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => handleMultiSelect('vibe', opt)}
-                  className={`py-6 px-4 rounded-xl border-2 font-bold uppercase tracking-widest text-xs transition-all ${
-                    preferences.vibe.includes(opt)
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-400'
-                      : 'border-white/10 bg-zinc-900 text-zinc-400 hover:border-white/30'
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 4 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h1 className="text-3xl font-black uppercase tracking-tight mb-2">Your Habits</h1>
             <p className="text-zinc-400 text-sm mb-8 font-medium">Help us find the right spots for you.</p>
@@ -206,7 +184,7 @@ function OnboardingWizard() {
           disabled={loading}
           className="w-full py-4 bg-white text-black font-black uppercase tracking-widest text-sm hover:bg-cyan-400 transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]"
         >
-          {loading ? 'Saving...' : step === 4 ? 'Complete Profile' : 'Next'}
+          {loading ? 'Saving...' : step === 3 ? 'Complete Profile' : 'Next'}
         </button>
       </div>
     </div>

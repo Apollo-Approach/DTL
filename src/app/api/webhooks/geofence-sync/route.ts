@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     // ── 1. Fetch all venues with coordinates ──
     const { data: venues, error: vErr } = await supabase
       .from('venues')
-      .select('id, name, address, location, situation_tags')
+      .select('id, name, address, location')
       .order('name');
 
     if (vErr) throw new Error(`Venues query failed: ${vErr.message}`);
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
     const { data: promos, error: pErr } = await supabase
       .from('promotions')
-      .select('id, venue_id, title, discount_value, recurring_day, active_from_time, active_until_time, situation_tags')
+      .select('id, venue_id, title, discount_value, recurring_day, active_from_time, active_until_time')
       .gt('active_until', now.toISOString())
       .or(`recurring_day.eq.${currentDay},recurring_day.is.null`);
 
@@ -116,7 +116,6 @@ export async function POST(request: Request) {
       // Extract lat/lng from PostGIS point
       lat: v.location ? parseFloat(v.location.coordinates?.[1] || '0') : 0,
       lng: v.location ? parseFloat(v.location.coordinates?.[0] || '0') : 0,
-      tags: v.situation_tags || [],
     }));
 
     // Build deal map: venue_id → best deal
@@ -251,12 +250,12 @@ export async function GET() {
     // Fetch venues with lat/lng via the public view
     const { data: venues } = await supabase
       .from('venues_public')
-      .select('id, name, address, lat, lng, situation_tags');
+      .select('id, name, address, lat, lng');
 
     // Fetch active deals
     const { data: promos } = await supabase
       .from('promotions')
-      .select('id, venue_id, title, discount_value, situation_tags')
+      .select('id, venue_id, title, discount_value')
       .gt('active_until', now.toISOString())
       .or(`recurring_day.eq.${currentDay},recurring_day.is.null`);
 
@@ -268,7 +267,6 @@ export async function GET() {
         address: v.address,
         lat: v.lat,
         lng: v.lng,
-        tags: v.situation_tags || [],
         deal: null as { headline: string; id: string } | null,
       })),
       timestamp: now.toISOString(),

@@ -24,27 +24,6 @@ interface VenueDetailModalProps {
   onClose: () => void;
 }
 
-// Situation tag display config
-const TAG_CONFIG: Record<string, { icon: string; bg: string; text: string }> = {
-  'cheap-drinks': { icon: '🍻', bg: 'bg-amber-500/20', text: 'text-amber-400' },
-  'live-music': { icon: '🎵', bg: 'bg-pink-500/20', text: 'text-pink-400' },
-  'late-night': { icon: '🌙', bg: 'bg-indigo-500/20', text: 'text-indigo-400' },
-  'no-cover': { icon: '🚫', bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
-  'patio': { icon: '☀️', bg: 'bg-yellow-500/20', text: 'text-yellow-400' },
-  'date-night': { icon: '💕', bg: 'bg-rose-500/20', text: 'text-rose-400' },
-  'student-friendly': { icon: '🎓', bg: 'bg-blue-500/20', text: 'text-blue-400' },
-  'craft-beer': { icon: '🍺', bg: 'bg-orange-500/20', text: 'text-orange-400' },
-  'cocktails': { icon: '🍸', bg: 'bg-purple-500/20', text: 'text-purple-400' },
-  'dance-floor': { icon: '💃', bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-400' },
-  'sports-bar': { icon: '🏈', bg: 'bg-green-500/20', text: 'text-green-400' },
-  'brunch': { icon: '🥞', bg: 'bg-amber-500/20', text: 'text-amber-400' },
-  'karaoke': { icon: '🎤', bg: 'bg-violet-500/20', text: 'text-violet-400' },
-  'trivia': { icon: '🧠', bg: 'bg-teal-500/20', text: 'text-teal-400' },
-};
-
-function getTagConfig(tag: string) {
-  return TAG_CONFIG[tag] || { icon: '🏷️', bg: 'bg-neutral-500/20', text: 'text-neutral-400' };
-}
 
 export default function VenueDetailModal({ venue, promos, events = [], constructionWarnings = [], onClose }: VenueDetailModalProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'events' | 'offers'>('details');
@@ -95,10 +74,6 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
     return dlat < 0.003 && dlng < 0.004;
   }).slice(0, 3);
 
-  // Merge situation tags from venue + active promos
-  const allTags = new Set<string>();
-  (venue.situation_tags || []).forEach(t => allTags.add(t));
-  promos.forEach(p => (p.situation_tags || []).forEach(t => allTags.add(t)));
 
   // Group promos by discount_value to prevent duplicates for everyday specials
   const groupedPromosMap = new Map();
@@ -164,20 +139,6 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
           </div>
         </div>
 
-        {/* Situation Tags Row — "Perfect For" badges */}
-        {allTags.size > 0 && (
-          <div className="px-5 pt-3 pb-1 flex flex-wrap gap-2">
-            <span className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold self-center mr-1">Perfect for</span>
-            {[...allTags].map(tag => {
-              const cfg = getTagConfig(tag);
-              return (
-                <span key={tag} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border border-white/5 ${cfg.bg} ${cfg.text}`}>
-                  {cfg.icon} {tag.replace(/-/g, ' ')}
-                </span>
-              );
-            })}
-          </div>
-        )}
 
         {/* Tab Bar */}
         <div className="flex border-b border-neutral-800 px-5">
@@ -374,18 +335,7 @@ export default function VenueDetailModal({ venue, promos, events = [], construct
                               : ''}
                           </p>
                         )}
-                        {promo.situation_tags && promo.situation_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {promo.situation_tags.map((tag: string) => {
-                              const cfg = getTagConfig(tag);
-                              return (
-                                <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${cfg.bg} ${cfg.text}`}>
-                                  {cfg.icon} {tag.replace(/-/g, ' ')}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
+
                       </div>
                       <span className="text-xs bg-purple-500 text-white px-3 py-1 rounded-full group-open:hidden shadow-lg shadow-purple-500/50 shrink-0 ml-3">
                         Redeem

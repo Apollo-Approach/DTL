@@ -24,14 +24,7 @@ export function calculateMatchScore(venueOfferings: Offerings | null | undefined
     if (overlap > 0) score += (overlap / userPreferences.cuisine.length) * 30;
   }
 
-  // 3. Vibe (30% weight)
-  if (userPreferences.vibe && userPreferences.vibe.length > 0) {
-    maxScore += 30;
-    const overlap = userPreferences.vibe.filter((v: string) => searchText.includes(v.toLowerCase())).length;
-    if (overlap > 0) score += (overlap / userPreferences.vibe.length) * 30;
-  }
-
-  // 4. Habits: Affordability (10% weight)
+  // 3. Habits: Affordability (10% weight)
   if (userPreferences.habits?.affordability) {
     maxScore += 10;
     if (searchText.includes(String(userPreferences.habits.affordability).toLowerCase())) {

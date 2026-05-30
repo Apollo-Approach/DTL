@@ -101,14 +101,7 @@ export default async function ProfilePage() {
                   )) || <span className="text-neutral-600 text-sm">None</span>}
                 </div>
               </div>
-              <div className="p-4 bg-black/30 border border-neutral-800 rounded-xl">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Vibe</h3>
-                <div className="flex flex-wrap gap-2">
-                  {profile.preferences.vibe?.map((v: string) => (
-                    <span key={v} className="px-2 py-1 bg-purple-900/30 text-purple-400 border border-purple-500/20 text-xs rounded-md">{v}</span>
-                  )) || <span className="text-neutral-600 text-sm">None</span>}
-                </div>
-              </div>
+
               <div className="p-4 bg-black/30 border border-neutral-800 rounded-xl">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Habits</h3>
                 <div className="flex gap-4">

@@ -17,7 +17,6 @@ export async function savePreferences(preferencesData: Preferences) {
   const validPreferences = {
     drinks: preferencesData.drinks || [],
     cuisine: preferencesData.cuisine || [],
-    vibe: preferencesData.vibe || [],
     habits: preferencesData.habits || {},
   };
 
