@@ -67,7 +67,9 @@ export function useVenueMarkers(
       // Category-based emoji icon
       const category = getVenueCategory(venue.type);
       const categoryEmoji: Record<string, string> = {
-        Eatery: '🍔', Eats2: '🥗🍷', Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️', Amenity: '🚻',
+        Eatery: '🍔',
+        Eats2: `<div style="position: relative; width: 20px; height: 20px;"><div style="position: absolute; top: -2px; left: -2px; font-size: 14px;">🥗</div><div style="position: absolute; bottom: -2px; right: -4px; font-size: 14px; z-index: 2;">🍷</div></div>`,
+        Bars: '🍺', Stage: '🎭', Nightlife: '🌙', Retail: '🛍️', Amenity: '🚻',
       };
       let emoji = categoryEmoji[category] || '📍';
       
