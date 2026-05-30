@@ -185,11 +185,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
     if (!isModalOpen || !mapContainer.current || !editingVenue) return;
 
     if (!mapRef.current) {
-      if (!(maplibregl as any).supported()) {
-        console.error("WebGL not supported");
-        setMapError(true);
-        return;
-      }
+
 
       try {
         mapRef.current = new maplibregl.Map({
