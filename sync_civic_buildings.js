@@ -1,13 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-import fs from 'fs'
+require('dotenv').config({ path: '.env.local' });
+const { createClient } = require('@supabase/supabase-js');
+const turf = require('@turf/turf');
+const fs = require('fs');
 
-dotenv.config({ path: '.env.local' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 function decodePostGISPoint(hexString) {
   try {
@@ -18,156 +14,136 @@ function decodePostGISPoint(hexString) {
   } catch(e) { return null; }
 }
 
-// Ray-casting algorithm for point in polygon
-function pointInPolygon(pt, geom) {
-  let inside = false;
-  const x = pt[0], y = pt[1];
+async function run() {
+  console.log("Loading building dataset...");
+  let buildings;
+  if (fs.existsSync('london_buildings.geojson')) {
+      buildings = JSON.parse(fs.readFileSync('london_buildings.geojson', 'utf8'));
+  } else {
+      const res = await fetch("https://hub.arcgis.com/api/v3/datasets/f5dd65b8b5fb440ab4092f6c8d2431f7_2/downloads/data?format=geojson&spatialRefId=4326&where=1%3D1");
+      buildings = await res.json();
+      fs.writeFileSync('london_buildings.geojson', JSON.stringify(buildings));
+  }
   
-  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
-  
-  for (const coordinates of polys) {
-    for (const ring of coordinates) {
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const xi = ring[i][0], yi = ring[i][1];
-        const xj = ring[j][0], yj = ring[j][1];
-        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
+  // Convert LineStrings to Polygons
+  let convertedCount = 0;
+  for (let i = 0; i < buildings.features.length; i++) {
+    const b = buildings.features[i];
+    if (b.geometry && b.geometry.type === 'LineString') {
+       let coords = b.geometry.coordinates;
+       if (coords.length >= 3) {
+           if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+               coords = [...coords, coords[0]]; // force close
+           }
+           b.geometry = { type: 'Polygon', coordinates: [coords] };
+           convertedCount++;
+       }
     }
   }
-  return inside;
-}
-
-// Distance from point to line segment in METERS
-function distToSegmentMeters(pt, v, w) {
-  // London, ON scale factors
-  const kx = 81400;  // meters per degree lon at lat 43
-  const ky = 111320; // meters per degree lat
-
-  const px = pt[0]*kx, py = pt[1]*ky;
-  const vx = v[0]*kx, vy = v[1]*ky;
-  const wx = w[0]*kx, wy = w[1]*ky;
-
-  const l2 = (vx - wx)**2 + (vy - wy)**2;
-  if (l2 === 0) return Math.sqrt((px - vx)**2 + (py - vy)**2);
-  let t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return Math.sqrt((px - (vx + t * (wx - vx)))**2 + (py - (vy + t * (wy - vy)))**2);
-}
-
-// Distance to the closest edge of the polygon in METERS
-function distToPolygonEdgeMeters(pt, geom) {
-  let minDist = Infinity;
-  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates];
-
-  for (const coordinates of polys) {
-    for (const ring of coordinates) {
-      for (let i = 0; i < ring.length - 1; i++) {
-        const d = distToSegmentMeters(pt, ring[i], ring[i+1]);
-        if (d < minDist) minDist = d;
-      }
-    }
-  }
-  return minDist;
-}
-
-async function syncBuildings() {
-  console.log("Fetching venues from database...");
-  const { data: venues, error } = await supabase.from('venues').select('id, name, type, late_night_eligible, location');
+  console.log(`Converted ${convertedCount} LineStrings to Polygons`);
   
-  if (error) return console.error(error);
-
-  console.log(`Querying City of London Open Data Building Outlines API for ${venues.length} venues...`);
+  const { data: venues } = await supabase.from('venues').select('id, name, type, late_night_eligible, location');
   
-  const featureCollection = {
-    type: "FeatureCollection",
-    features: []
-  };
+  const featureCollection = { type: "FeatureCollection", features: [] };
+  let matchCount = 0;
 
   for (const venue of venues) {
     if (!venue.location) continue;
-    const dbCoords = decodePostGISPoint(venue.location);
-    if (!dbCoords) continue;
+    const coords = decodePostGISPoint(venue.location);
+    if (!coords) continue;
+    
+    const pt = turf.point([coords.lng, coords.lat]);
+    let closest = null;
+    let minD = Infinity;
 
-    try {
-      // Create a small bounding box (~50m) around the coordinate
-      const d = 0.0005;
-      const geometryParam = encodeURIComponent(`{"xmin":${dbCoords.lng - d},"ymin":${dbCoords.lat - d},"xmax":${dbCoords.lng + d},"ymax":${dbCoords.lat + d},"spatialReference":{"wkid":4326}}`);
-      const url = `https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query?geometry=${geometryParam}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&f=geojson`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (data && data.features && data.features.length > 0) {
-        // Sort by edge distance instead of centroid distance
-        const pt = [dbCoords.lng, dbCoords.lat];
-        
-        data.features.sort((a, b) => {
-           let distA = Infinity;
-           let distB = Infinity;
-           
-           if (a.geometry) {
-             if (pointInPolygon(pt, a.geometry)) {
-               distA = 0;
-             } else {
-               distA = distToPolygonEdgeMeters(pt, a.geometry);
-             }
-           }
-           if (b.geometry) {
-             if (pointInPolygon(pt, b.geometry)) {
-               distB = 0;
-             } else {
-               distB = distToPolygonEdgeMeters(pt, b.geometry);
-             }
-           }
-           
-           // Store the distance in the feature for filtering below
-           a.properties._distToPin = distA;
-           b.properties._distToPin = distB;
-           
-           return distA - distB;
-        });
-        
-        const bestFeature = data.features[0];
-        // Only accept if the distance is 30 meters or less.
-        // This acts as the "street bounding logic" to prevent snapping to a building across the street!
-        if (bestFeature.properties._distToPin <= 30) {
-          let geom = bestFeature.geometry;
-
-          // Add venue properties to the geojson feature
-          const feature = {
-            type: 'Feature',
-            geometry: geom,
-            properties: {
-              venue_id: venue.id,
-              name: venue.name,
-              type: venue.type,
-              hasSpecials: !!venue.late_night_eligible,
-              height: 10 // Default extrusion height, no HEIGHT property in Layer 3
-            }
-          };
-
-          featureCollection.features.push(feature);
-          process.stdout.write('🏢');
-        } else {
-          // The closest building is too far away (e.g. across the street)
-          process.stdout.write('❌');
+    const threshold = 0.001; 
+    const candidates = buildings.features.filter(b => {
+      if (!b.geometry || !b.geometry.coordinates || !b.geometry.coordinates[0]) return false;
+      const firstCoord = (b.geometry.type === 'Polygon' || b.geometry.type === 'MultiPolygon') 
+                         ? b.geometry.coordinates[0][0] 
+                         : b.geometry.coordinates[0];
+      if (!firstCoord || typeof firstCoord[0] !== 'number') return false;
+      return Math.abs(firstCoord[0] - coords.lng) < threshold && 
+             Math.abs(firstCoord[1] - coords.lat) < threshold;
+    });
+    
+    for (const b of candidates) {
+      if (!b.geometry) continue;
+      try {
+        if (turf.booleanPointInPolygon(pt, b)) {
+          minD = 0;
+          closest = b;
+          break; // Perfect match
         }
-      } else {
-        process.stdout.write('❌');
-      }
-    } catch (err) {
-      process.stdout.write('E');
+      } catch(e) {}
+      
+      try {
+        let lines;
+        if (b.geometry.type === 'Polygon') {
+            lines = turf.polygonToLine(b);
+        } else if (b.geometry.type === 'MultiPolygon') {
+            lines = turf.polygonToLine(turf.polygon(b.geometry.coordinates[0])); // rough approx
+        } else {
+            continue;
+        }
+
+        if (lines.type === 'FeatureCollection') {
+          for (let f of lines.features) {
+            let d = turf.pointToLineDistance(pt, f, {units: 'meters'});
+            if (d < minD) { minD = d; closest = b; }
+          }
+        } else {
+          let d = turf.pointToLineDistance(pt, lines, {units: 'meters'});
+          if (d < minD) { minD = d; closest = b; }
+        }
+      } catch(e) {}
     }
     
-    // Slight delay to respect municipal servers
-    await new Promise(r => setTimeout(r, 200));
+    if (closest && minD <= 30) {
+      featureCollection.features.push({
+        type: 'Feature',
+        geometry: closest.geometry,
+        properties: {
+          venue_id: venue.id,
+          name: venue.name,
+          type: venue.type,
+          hasSpecials: !!venue.late_night_eligible,
+          height: 10
+        }
+      });
+      matchCount++;
+      process.stdout.write('🏢');
+    } else {
+      const d = 0.0001; 
+      const fallbackGeom = {
+        type: "Polygon",
+        coordinates: [[
+          [coords.lng - d, coords.lat - d],
+          [coords.lng + d, coords.lat - d],
+          [coords.lng + d, coords.lat + d],
+          [coords.lng - d, coords.lat + d],
+          [coords.lng - d, coords.lat - d]
+        ]]
+      };
+      featureCollection.features.push({
+        type: 'Feature',
+        geometry: fallbackGeom,
+        properties: {
+          venue_id: venue.id,
+          name: venue.name,
+          type: venue.type,
+          hasSpecials: !!venue.late_night_eligible,
+          height: 10,
+          is_synthetic: true
+        }
+      });
+      process.stdout.write('🟨');
+    }
   }
-  
+
   const path = 'public/civic_data/civic_venue_buildings.geojson';
   fs.writeFileSync(path, JSON.stringify(featureCollection, null, 2));
-  console.log(`\n\nSync Complete! Extracted ${featureCollection.features.length} perfect municipal building footprints.`);
-  console.log(`Saved to ${path}`);
+  console.log(`\n\nSync Complete! Extracted ${matchCount} perfect municipal building footprints.`);
 }
 
-syncBuildings();
+run();
