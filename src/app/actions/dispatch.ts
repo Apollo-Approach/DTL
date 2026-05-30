@@ -33,10 +33,26 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
  * 6. Broadcast dispatch notification
  */
 export async function autoDispatch(incidentId: string, incidentLat: number, incidentLng: number) {
+  const authClient = await createServerClient();
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user) {
+    return { success: false, error: 'Unauthorized: You must be logged in to dispatch responders.', dispatched_to: null };
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['m3_dispatcher', 'sysadmin', 'm5_sysadmin'].includes(profile.role)) {
+    return { success: false, error: 'Unauthorized: Insufficient permissions to dispatch responders.', dispatched_to: null };
+  }
 
   // 1. Get all on-duty responders
   const { data: activeShifts, error: shiftsError } = await supabase
