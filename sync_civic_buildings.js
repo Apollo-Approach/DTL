@@ -15,7 +15,16 @@ function decodePostGISPoint(hexString) {
 }
 
 async function run() {
-  console.log("Fetching building polygons from London MapServer...");
+  console.log("Loading local london_buildings.geojson (MapServer/3 Polygons)...");
+  if (!fs.existsSync('london_buildings.geojson')) {
+    console.error("Missing london_buildings.geojson. Please run download_london_buildings.js first.");
+    process.exit(1);
+  }
+  
+  const buildings = JSON.parse(fs.readFileSync('london_buildings.geojson', 'utf8'));
+  console.log(`Loaded ${buildings.features.length} local polygon footprints.`);
+
+  console.log("Fetching venues from Supabase...");
   const { data: venues } = await supabase.from('venues').select('id, name, type, late_night_eligible, location');
   
   const featureCollection = { type: "FeatureCollection", features: [] };
@@ -26,99 +35,90 @@ async function run() {
     const coords = decodePostGISPoint(venue.location);
     if (!coords) continue;
     
-    // Create bounding box around venue (~100m)
-    const d = 0.001; 
-    const xmin = coords.lng - d;
-    const ymin = coords.lat - d;
-    const xmax = coords.lng + d;
-    const ymax = coords.lat + d;
-    const envelope = `${xmin},${ymin},${xmax},${ymax}`;
-
-    const url = `https://maps.london.ca/server/rest/services/OpenData/OpenData_BaseMaps/MapServer/3/query?geometry=${envelope}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&f=geojson`;
+    const pt = turf.point([coords.lng, coords.lat]);
     
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
+    // Efficient bounding box filter
+    const threshold = 0.001; 
+    let candidates = buildings.features.filter(b => {
+      if (!b.geometry || !b.geometry.coordinates || !b.geometry.coordinates[0]) return false;
+      const firstCoord = b.geometry.coordinates[0][0];
+      if (!firstCoord) return false;
+      return Math.abs(firstCoord[0] - coords.lng) < threshold && Math.abs(firstCoord[1] - coords.lat) < threshold;
+    });
+
+    let closest = null;
+    let minD = Infinity;
+
+    for (const b of candidates) {
+      if (!b.geometry) continue;
       
-      let closest = null;
-      let minD = Infinity;
-      const pt = turf.point([coords.lng, coords.lat]);
-
-      if (data.features && data.features.length > 0) {
-        for (const b of data.features) {
-          if (!b.geometry) continue;
-          
-          try {
-            if (turf.booleanPointInPolygon(pt, b)) {
-              minD = 0;
-              closest = b;
-              break;
-            }
-          } catch(e) {}
-
-          try {
-            let lines = turf.polygonToLine(b);
-            if (lines.type === 'FeatureCollection') {
-              for (let f of lines.features) {
-                let dist = turf.pointToLineDistance(pt, f, {units: 'meters'});
-                if (dist < minD) { minD = dist; closest = b; }
-              }
-            } else {
-              let dist = turf.pointToLineDistance(pt, lines, {units: 'meters'});
-              if (dist < minD) { minD = dist; closest = b; }
-            }
-          } catch(e) {}
+      try {
+        if (turf.booleanPointInPolygon(pt, b)) {
+          minD = 0;
+          closest = b;
+          break;
         }
-      }
+      } catch(e) {}
 
-      if (closest && minD <= 30) {
-        featureCollection.features.push({
-          type: 'Feature',
-          geometry: closest.geometry,
-          properties: {
-            venue_id: venue.id,
-            name: venue.name,
-            type: venue.type,
-            hasSpecials: !!venue.late_night_eligible,
-            height: 10
+      try {
+        let lines = turf.polygonToLine(b);
+        if (lines.type === 'FeatureCollection') {
+          for (let f of lines.features) {
+            let dist = turf.pointToLineDistance(pt, f, {units: 'meters'});
+            if (dist < minD) { minD = dist; closest = b; }
           }
-        });
-        matchCount++;
-        process.stdout.write('🏢');
-      } else {
-        const fallD = 0.0001; 
-        const fallbackGeom = {
-          type: "Polygon",
-          coordinates: [[
-            [coords.lng - fallD, coords.lat - fallD],
-            [coords.lng + fallD, coords.lat - fallD],
-            [coords.lng + fallD, coords.lat + fallD],
-            [coords.lng - fallD, coords.lat + fallD],
-            [coords.lng - fallD, coords.lat - fallD]
-          ]]
-        };
-        featureCollection.features.push({
-          type: 'Feature',
-          geometry: fallbackGeom,
-          properties: {
-            venue_id: venue.id,
-            name: venue.name,
-            type: venue.type,
-            hasSpecials: !!venue.late_night_eligible,
-            height: 10,
-            is_synthetic: true
-          }
-        });
-        process.stdout.write('🟨');
-      }
-    } catch(err) {
-      console.log(`Failed to fetch for ${venue.name}:`, err.message);
+        } else {
+          let dist = turf.pointToLineDistance(pt, lines, {units: 'meters'});
+          if (dist < minD) { minD = dist; closest = b; }
+        }
+      } catch(e) {}
+    }
+
+    if (closest && minD <= 30) {
+      featureCollection.features.push({
+        type: 'Feature',
+        geometry: closest.geometry,
+        properties: {
+          venue_id: venue.id,
+          name: venue.name,
+          type: venue.type,
+          hasSpecials: !!venue.late_night_eligible,
+          height: 10
+        }
+      });
+      matchCount++;
+      process.stdout.write('🏢');
+    } else {
+      const fallD = 0.0001; 
+      const fallbackGeom = {
+        type: "Polygon",
+        coordinates: [[
+          [coords.lng - fallD, coords.lat - fallD],
+          [coords.lng + fallD, coords.lat - fallD],
+          [coords.lng + fallD, coords.lat + fallD],
+          [coords.lng - fallD, coords.lat + fallD],
+          [coords.lng - fallD, coords.lat - fallD]
+        ]]
+      };
+      featureCollection.features.push({
+        type: 'Feature',
+        geometry: fallbackGeom,
+        properties: {
+          venue_id: venue.id,
+          name: venue.name,
+          type: venue.type,
+          hasSpecials: !!venue.late_night_eligible,
+          height: 10,
+          is_synthetic: true
+        }
+      });
+      process.stdout.write('🟨');
     }
   }
 
   const path = 'public/civic_data/civic_venue_buildings.geojson';
   fs.writeFileSync(path, JSON.stringify(featureCollection, null, 2));
-  console.log(`\n\nSync Complete! Extracted ${matchCount} perfect municipal building footprints.`);
+  console.log(`\n\nLocal Sync Complete! Extracted ${matchCount} perfect municipal building footprints.`);
 }
 
 run();
