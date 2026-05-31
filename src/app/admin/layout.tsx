@@ -51,6 +51,7 @@ export default async function AdminLayout({
           <div className="flex gap-4 ml-8">
             <a href="/admin/dashboard" className="text-sm font-medium text-neutral-300 hover:text-white">Dashboard</a>
             <a href="/admin/venues" className="text-sm font-medium text-neutral-300 hover:text-white">Venues</a>
+            <a href="/admin/events" className="text-sm font-medium text-neutral-300 hover:text-white">Events</a>
           </div>
         </div>
         
