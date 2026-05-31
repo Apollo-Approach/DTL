@@ -406,42 +406,59 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                     </div>
                     
                     <div className="space-y-2">
-                      {(editingVenue.scraper_directives || []).map((dir, idx) => (
-                        <div key={idx} className="flex gap-2">
-                          <input 
-                            type="text"
-                            value={dir.platform}
-                            placeholder="Platform (e.g. facebook)"
-                            onChange={(e) => {
-                              const dirs = [...(editingVenue.scraper_directives || [])];
-                              dirs[idx] = { ...dirs[idx], platform: e.target.value };
-                              setEditingVenue({ ...editingVenue, scraper_directives: dirs });
-                            }}
-                            className="w-1/3 bg-black border border-neutral-800 rounded-lg px-3 py-1 outline-none focus:border-indigo-500 text-xs text-neutral-300"
-                          />
-                          <input 
-                            type="text"
-                            value={dir.url}
-                            placeholder="https://..."
-                            onChange={(e) => {
-                              const dirs = [...(editingVenue.scraper_directives || [])];
-                              dirs[idx] = { ...dirs[idx], url: e.target.value };
-                              setEditingVenue({ ...editingVenue, scraper_directives: dirs });
-                            }}
-                            className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-1 outline-none focus:border-indigo-500 text-xs text-white"
-                          />
-                          <button 
-                            onClick={() => {
-                              const dirs = [...(editingVenue.scraper_directives || [])];
-                              dirs.splice(idx, 1);
-                              setEditingVenue({ ...editingVenue, scraper_directives: dirs });
-                            }}
-                            className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                      {(editingVenue.scraper_directives || []).map((dir, idx) => {
+                        const currentUrl = dir.url.trim().toLowerCase();
+                        const isDuplicateSelf = currentUrl !== '' && (editingVenue.scraper_directives || []).filter((d, i) => i !== idx && d.url.trim().toLowerCase() === currentUrl).length > 0;
+                        const duplicateOther = currentUrl !== '' ? venues.find(v => v.id !== editingVenue.id && (v.scraper_directives || []).some(d => d.url.trim().toLowerCase() === currentUrl)) : null;
+                        
+                        return (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <div className="flex gap-2">
+                            <input 
+                              type="text"
+                              value={dir.platform}
+                              placeholder="Platform (e.g. facebook)"
+                              onChange={(e) => {
+                                const dirs = [...(editingVenue.scraper_directives || [])];
+                                dirs[idx] = { ...dirs[idx], platform: e.target.value };
+                                setEditingVenue({ ...editingVenue, scraper_directives: dirs });
+                              }}
+                              className="w-1/3 bg-black border border-neutral-800 rounded-lg px-3 py-1 outline-none focus:border-indigo-500 text-xs text-neutral-300"
+                            />
+                            <input 
+                              type="text"
+                              value={dir.url}
+                              placeholder="https://..."
+                              onChange={(e) => {
+                                const dirs = [...(editingVenue.scraper_directives || [])];
+                                dirs[idx] = { ...dirs[idx], url: e.target.value };
+                                setEditingVenue({ ...editingVenue, scraper_directives: dirs });
+                              }}
+                              className={`flex-1 bg-black border rounded-lg px-3 py-1 outline-none text-xs text-white ${
+                                isDuplicateSelf ? 'border-red-500 focus:border-red-500' : 
+                                duplicateOther ? 'border-amber-500 focus:border-amber-500' : 
+                                'border-neutral-800 focus:border-indigo-500'
+                              }`}
+                            />
+                            <button 
+                              onClick={() => {
+                                const dirs = [...(editingVenue.scraper_directives || [])];
+                                dirs.splice(idx, 1);
+                                setEditingVenue({ ...editingVenue, scraper_directives: dirs });
+                              }}
+                              className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          {isDuplicateSelf && (
+                            <div className="text-red-400 text-[10px] pl-[34%]">Error: This URL is duplicated above.</div>
+                          )}
+                          {duplicateOther && !isDuplicateSelf && (
+                            <div className="text-amber-400 text-[10px] pl-[34%]">Warning: URL is already used by <strong>{duplicateOther.name}</strong>.</div>
+                          )}
                         </div>
-                      ))}
+                      )})}
                       {(editingVenue.scraper_directives || []).length === 0 && (
                         <div className="text-xs text-neutral-500 text-center py-2">
                           No specific scraping URLs defined.
