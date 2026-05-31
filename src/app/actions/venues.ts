@@ -10,6 +10,8 @@ async function fetchBuildingFootprint(lat: number, lng: number) {
       geometry: `${lng},${lat}`,
       geometryType: 'esriGeometryPoint',
       spatialRel: 'esriSpatialRelIntersects',
+      distance: '10',
+      units: 'esriSRUnit_Meter',
       outFields: '*',
       returnGeometry: 'true',
       f: 'geojson',
