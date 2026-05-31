@@ -13,6 +13,11 @@ export default async function AdminEventsPage() {
     .gte('start_time', new Date().toISOString())
     .order('start_time', { ascending: true });
 
+  const { data: venues } = await supabase
+    .from('venues')
+    .select('id, name')
+    .order('name', { ascending: true });
+
   return (
     <div className="max-w-7xl mx-auto pb-24">
       <div className="mb-8 flex justify-between items-end">
@@ -22,7 +27,7 @@ export default async function AdminEventsPage() {
         </div>
       </div>
 
-      <EventManager initialEvents={events || []} />
+      <EventManager initialEvents={events || []} venues={venues || []} />
     </div>
   );
 }
