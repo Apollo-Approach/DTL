@@ -18,7 +18,7 @@ export interface Venue {
   image_url?: string;
   is_manually_curated?: boolean;
   offerings?: any;
-  scraper_directives?: Record<string, string>;
+  scraper_directives?: { platform: string, url: string }[];
 }
 
 export default function VenueManager({ initialVenues }: { initialVenues: Venue[] }) {
@@ -78,7 +78,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
       is_manually_curated: true,
       image_url: '',
       offerings: {},
-      scraper_directives: {}
+      scraper_directives: []
     });
     setIsModalOpen(true);
   };
@@ -138,7 +138,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         image_url: editingVenue.image_url,
         is_manually_curated: editingVenue.is_manually_curated,
         offerings: parsedOfferings,
-        scraper_directives: editingVenue.scraper_directives || {}
+        scraper_directives: editingVenue.scraper_directives || []
       };
       
       if (editingVenue.lat !== undefined && editingVenue.lng !== undefined) {
@@ -385,8 +385,8 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                       <label className="text-xs font-bold text-neutral-400">Scraper Directives</label>
                       <button 
                         onClick={() => {
-                          const dirs = { ...(editingVenue.scraper_directives || {}) };
-                          dirs[`New Field ${Object.keys(dirs).length + 1}`] = '';
+                          const dirs = [...(editingVenue.scraper_directives || [])];
+                          dirs.push({ platform: '', url: '' });
                           setEditingVenue({ ...editingVenue, scraper_directives: dirs });
                         }}
                         className="text-indigo-400 hover:text-indigo-300 text-xs flex items-center gap-1 font-bold"
@@ -396,36 +396,34 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                     </div>
                     
                     <div className="space-y-2">
-                      {Object.entries(editingVenue.scraper_directives || {}).map(([key, value], idx) => (
+                      {(editingVenue.scraper_directives || []).map((dir, idx) => (
                         <div key={idx} className="flex gap-2">
                           <input 
                             type="text"
-                            value={key}
+                            value={dir.platform}
                             placeholder="Platform (e.g. facebook)"
                             onChange={(e) => {
-                              const dirs = { ...editingVenue.scraper_directives };
-                              const oldVal = dirs[key];
-                              delete dirs[key];
-                              dirs[e.target.value] = oldVal;
+                              const dirs = [...(editingVenue.scraper_directives || [])];
+                              dirs[idx] = { ...dirs[idx], platform: e.target.value };
                               setEditingVenue({ ...editingVenue, scraper_directives: dirs });
                             }}
                             className="w-1/3 bg-black border border-neutral-800 rounded-lg px-3 py-1 outline-none focus:border-indigo-500 text-xs text-neutral-300"
                           />
                           <input 
                             type="text"
-                            value={value}
+                            value={dir.url}
                             placeholder="https://..."
                             onChange={(e) => {
-                              const dirs = { ...editingVenue.scraper_directives };
-                              dirs[key] = e.target.value;
+                              const dirs = [...(editingVenue.scraper_directives || [])];
+                              dirs[idx] = { ...dirs[idx], url: e.target.value };
                               setEditingVenue({ ...editingVenue, scraper_directives: dirs });
                             }}
                             className="flex-1 bg-black border border-neutral-800 rounded-lg px-3 py-1 outline-none focus:border-indigo-500 text-xs text-white"
                           />
                           <button 
                             onClick={() => {
-                              const dirs = { ...editingVenue.scraper_directives };
-                              delete dirs[key];
+                              const dirs = [...(editingVenue.scraper_directives || [])];
+                              dirs.splice(idx, 1);
                               setEditingVenue({ ...editingVenue, scraper_directives: dirs });
                             }}
                             className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -434,7 +432,7 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
                           </button>
                         </div>
                       ))}
-                      {Object.keys(editingVenue.scraper_directives || {}).length === 0 && (
+                      {(editingVenue.scraper_directives || []).length === 0 && (
                         <div className="text-xs text-neutral-500 text-center py-2">
                           No specific scraping URLs defined.
                         </div>
