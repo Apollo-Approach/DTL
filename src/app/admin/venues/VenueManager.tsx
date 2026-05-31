@@ -130,6 +130,16 @@ export default function VenueManager({ initialVenues }: { initialVenues: Venue[]
         }
       }
 
+      // Validate scraper directives for duplicate URLs
+      const directives = editingVenue.scraper_directives || [];
+      const urls = directives.map(d => d.url.trim().toLowerCase()).filter(u => u !== '');
+      const uniqueUrls = new Set(urls);
+      if (uniqueUrls.size !== urls.length) {
+        alert("Duplicate URLs detected in Scraper Directives! Please ensure all target URLs are unique.");
+        setIsSaving(false);
+        return;
+      }
+
       const payload: any = {
         name: editingVenue.name,
         description: editingVenue.description,
