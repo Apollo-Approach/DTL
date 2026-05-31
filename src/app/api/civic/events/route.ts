@@ -83,11 +83,19 @@ async function fetchAggregatedEvents(): Promise<EventData[]> {
       priceRange = `$${Number(event.price).toFixed(1)} CAD`;
     }
 
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'America/Toronto',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+    const formatted = formatter.format(startDate);
+    const [localDate, localTime] = formatted.split(' ');
+
     return {
       id: event.id,
       name: event.name,
-      date: startDate.toISOString().split('T')[0], // YYYY-MM-DD
-      time: startDate.toTimeString().slice(0, 5),   // HH:MM
+      date: localDate, // YYYY-MM-DD in local time
+      time: localTime, // HH:MM in local time
       venue: venue?.name || event.venue_subroom || 'TBD',
       venueAddress: venue?.address || null,
       lat: null,  // We don't expose raw coords here
